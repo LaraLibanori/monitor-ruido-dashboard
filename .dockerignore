@@ -1,0 +1,7 @@
+# Não enviar para o build da imagem do servidor
+app/
+.github/
+.git/
+.env
+__pycache__/
+*.pyc

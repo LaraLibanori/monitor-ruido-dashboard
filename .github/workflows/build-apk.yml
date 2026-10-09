@@ -1,0 +1,53 @@
+# Gera o APK do aplicativo automaticamente no GitHub.
+# Toda vez que algo na pasta app/ mudar (ou ao clicar em "Run workflow"),
+# o GitHub compila e deixa o arquivo para download na aba "Actions".
+name: Gerar APK do app
+
+on:
+  push:
+    paths:
+      - "app/**"
+      - ".github/workflows/build-apk.yml"
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Completar a pasta android (não sobrescreve o que já existe)
+        run: flutter create --platforms=android --org br.univesp --project-name monitor_ruido .
+
+      - name: Baixar dependências
+        run: flutter pub get
+
+      - name: Análise do código (informativo)
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        continue-on-error: true
+
+      - name: Testes (informativo)
+        run: flutter test
+        continue-on-error: true
+
+      - name: Compilar APK
+        run: flutter build apk --release
+
+      - name: Disponibilizar o APK para download
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitor-ruido-apk
+          path: app/build/app/outputs/flutter-apk/app-release.apk
