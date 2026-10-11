@@ -25,6 +25,16 @@ O plano completo dos dois produtos de interface está em:
 
 `docs/plano-projeto-dashboard-android.md`
 
+O relatório de preparação para gravação dos ESP32, teste integrado e
+instalação está em:
+
+`docs/relatorio-final-preparacao-hardware.md`
+
+O roteiro de testes do computador, quatro ESP32, Android, calibração e
+estabilidade de 24 horas está em:
+
+`docs/roteiro-validacao-final.md`
+
 Ele separa o trabalho em:
 
 - **Projeto 1 — Dashboard Web**

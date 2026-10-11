@@ -35,13 +35,11 @@ jobs:
       - name: Baixar dependências
         run: flutter pub get
 
-      - name: Análise do código (informativo)
+      - name: Análise do código
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
-        continue-on-error: true
 
-      - name: Testes (informativo)
+      - name: Testes
         run: flutter test
-        continue-on-error: true
 
       - name: Compilar APK
         run: flutter build apk --release

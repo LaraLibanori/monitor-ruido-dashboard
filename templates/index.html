@@ -4,10 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitor de Ruído - FastAPI + Docker</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --green:  #00e5a0;
@@ -22,13 +18,91 @@
         * { box-sizing: border-box; }
 
         body {
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'DM Sans', Arial, sans-serif;
             background: var(--bg);
             color: #e2e8f0;
             min-height: 100vh;
         }
 
-        .mono { font-family: 'Space Mono', monospace; }
+        .mono { font-family: 'Space Mono', Consolas, monospace; }
+
+        /* Utility classes kept local so the dashboard works without a CDN. */
+        .max-w-7xl { max-width: 80rem; }
+        .mx-auto { margin-left: auto; margin-right: auto; }
+        .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+        .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+        .p-5 { padding: 1.25rem; }
+        .p-6 { padding: 1.5rem; }
+        .py-3 { padding-top: .75rem; padding-bottom: .75rem; }
+        .px-3 { padding-left: .75rem; padding-right: .75rem; }
+        .mt-1 { margin-top: .25rem; }
+        .mt-2 { margin-top: .5rem; }
+        .mt-3 { margin-top: .75rem; }
+        .mt-10 { margin-top: 2.5rem; }
+        .mb-2 { margin-bottom: .5rem; }
+        .mb-3 { margin-bottom: .75rem; }
+        .mb-5 { margin-bottom: 1.25rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+        .mb-8 { margin-bottom: 2rem; }
+        .gap-2 { gap: .5rem; }
+        .gap-3 { gap: .75rem; }
+        .gap-4 { gap: 1rem; }
+        .gap-6 { gap: 1.5rem; }
+        .flex { display: flex; }
+        .grid { display: grid; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .items-start { align-items: flex-start; }
+        .justify-center { justify-content: center; }
+        .justify-between { justify-content: space-between; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .w-full { width: 100%; }
+        .overflow-x-auto { overflow-x: auto; }
+        .hidden { display: none !important; }
+        .ml-auto { margin-left: auto; }
+        .flex-shrink-0 { flex-shrink: 0; }
+        .font-bold { font-weight: 700; }
+        .font-semibold { font-weight: 600; }
+        .text-xs { font-size: .75rem; }
+        .text-sm { font-size: .875rem; }
+        .text-lg { font-size: 1.125rem; }
+        .text-2xl { font-size: 1.5rem; }
+        .text-white { color: #fff; }
+        .text-gray-400 { color: #94a3b8; }
+        .text-gray-500 { color: #64748b; }
+        .text-gray-600 { color: #475569; }
+        .text-gray-700 { color: #334155; }
+        .text-red-100 { color: #fee2e2; }
+        .text-red-200 { color: #fecaca; }
+        .text-red-300 { color: #fca5a5; }
+        .text-red-400 { color: #f87171; }
+        .bg-gray-800 { background: #1f2937; }
+        .rounded-full { border-radius: 9999px; }
+        .rounded-xl { border-radius: .75rem; }
+        .border-b { border-bottom-width: 1px; border-bottom-style: solid; }
+        .border-gray-800 { border-color: #1f2937; }
+        .divide-y > * + * { border-top: 1px solid rgba(31,41,55,.6); }
+        .tracking-tight { letter-spacing: -.025em; }
+        .tracking-widest { letter-spacing: .1em; }
+        .uppercase { text-transform: uppercase; }
+        .whitespace-nowrap { white-space: nowrap; }
+        .transition-colors { transition: background .15s, color .15s; }
+        .card a:hover { background: #374151; }
+        .grid-cols-1 { grid-template-columns: minmax(0, 1fr); }
+        .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        @media (min-width: 768px) {
+            .md\:flex-row { flex-direction: row; }
+            .md\:items-start { align-items: flex-start; }
+            .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+        @media (min-width: 1024px) {
+            .lg\:grid-cols-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+            .lg\:col-span-5 { grid-column: span 5 / span 5; }
+            .lg\:col-span-7 { grid-column: span 7 / span 7; }
+        }
 
         /* ── Silence Warning Banner ── */
         #silence-banner {
@@ -347,51 +421,9 @@
     let rmsChart = null;
 
     function buildChart() {
-        const ctx = document.getElementById('rmsChart');
-        rmsChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'RMS',
-                    data: [],
-                    borderColor: '#00e5a0',
-                    backgroundColor: 'rgba(0,229,160,0.06)',
-                    borderWidth: 2,
-                    tension: 0.35,
-                    pointRadius: 2,
-                    pointHoverRadius: 5,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: { duration: 400 },
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: '#0e1318',
-                        borderColor: '#1a2230',
-                        borderWidth: 1,
-                        titleColor: '#94a3b8',
-                        bodyColor: '#00e5a0',
-                        bodyFont: { family: 'Space Mono', size: 12 }
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: 'rgba(255,255,255,0.04)' },
-                        ticks: { color: '#475569', font: { family: 'Space Mono', size: 10 } }
-                    },
-                    x: {
-                        grid: { color: 'rgba(255,255,255,0.04)' },
-                        ticks: { color: '#475569', font: { family: 'Space Mono', size: 9 }, maxRotation: 45 }
-                    }
-                }
-            }
-        });
+        rmsChart = document.getElementById('rmsChart');
+        rmsChart.width = rmsChart.clientWidth || 600;
+        rmsChart.height = rmsChart.clientHeight || 280;
     }
 
     function updateChart(data) {
@@ -407,11 +439,55 @@
         const colorMap = { baixo: '#00e5a0', medio: '#fbbf24', alto: '#f97316', muito_alto: '#ef4444' };
         const col = last ? (colorMap[last.noise_level] || '#00e5a0') : '#00e5a0';
 
-        rmsChart.data.labels = labels;
-        rmsChart.data.datasets[0].data = values;
-        rmsChart.data.datasets[0].borderColor = col;
-        rmsChart.data.datasets[0].backgroundColor = col.replace(')', ',0.06)').replace('rgb', 'rgba');
-        rmsChart.update();
+        const ctx = rmsChart.getContext('2d');
+        const width = rmsChart.clientWidth || 600;
+        const height = rmsChart.clientHeight || 280;
+        const left = 42;
+        const right = 12;
+        const top = 16;
+        const bottom = 30;
+        const plotWidth = Math.max(1, width - left - right);
+        const plotHeight = Math.max(1, height - top - bottom);
+        const max = Math.max(1, ...values);
+        rmsChart.width = width;
+        rmsChart.height = height;
+        ctx.clearRect(0, 0, width, height);
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillStyle = '#475569';
+        ctx.font = '10px Consolas, monospace';
+        ctx.beginPath();
+        ctx.moveTo(left, top);
+        ctx.lineTo(left, top + plotHeight);
+        ctx.lineTo(left + plotWidth, top + plotHeight);
+        ctx.stroke();
+        ctx.fillText(max.toFixed(0), 2, top + 4);
+        ctx.fillText('0', 24, top + plotHeight);
+        if (!values.length) return;
+        const point = (value, index) => ({
+            x: left + (values.length === 1 ? plotWidth / 2 : index * plotWidth / (values.length - 1)),
+            y: top + plotHeight - (value / max) * plotHeight,
+        });
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        values.forEach((value, index) => {
+            const p = point(value, index);
+            if (index === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+        ctx.fillStyle = col;
+        values.forEach((value, index) => {
+            const p = point(value, index);
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.fillStyle = '#475569';
+        ctx.fillText(labels[0] || '', left, height - 8);
+        if (labels.length > 1) {
+            ctx.fillText(labels[labels.length - 1] || '', width - 70, height - 8);
+        }
     }
 
     // ─────────────────────────────────────────

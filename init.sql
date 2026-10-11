@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS noise_readings (
     is_silence_period BOOLEAN    NOT NULL DEFAULT FALSE
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_readings_sensor_sequence
+    ON noise_readings(sensor_id, sequence);
+
 -- Índices para consultas frequentes
 CREATE INDEX IF NOT EXISTS idx_readings_sensor_id    ON noise_readings(sensor_id);
 CREATE INDEX IF NOT EXISTS idx_readings_received_at  ON noise_readings(received_at DESC);

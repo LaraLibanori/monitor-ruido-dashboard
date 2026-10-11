@@ -14,7 +14,9 @@
 
 #include <Arduino.h>
 #include <HTTPClient.h>
+#include <Preferences.h>
 #include <WiFi.h>
+#include <math.h>
 #include "driver/i2s.h"
 
 const char *WIFI_SSID = "NET_TDLL";
@@ -29,11 +31,14 @@ constexpr int PIN_I2S_SD = 33;
 constexpr int PIN_I2S_SCK = 26;
 constexpr size_t SAMPLE_COUNT = 1024;
 constexpr uint32_t SEND_INTERVAL_MS = 5000;
+constexpr uint32_t SEQUENCE_BLOCK_SIZE = 1000;
+constexpr uint32_t I2S_READ_TIMEOUT_MS = 2000;
 
+Preferences preferences;
 uint32_t sequenceNumber = 0;
 uint32_t nextSendAt = 0;
 
-void configureI2S() {
+bool configureI2S() {
   const i2s_config_t config = {
       .mode = static_cast<i2s_mode_t>(I2S_MODE_MASTER | I2S_MODE_RX),
       .sample_rate = 44100,
@@ -53,16 +58,26 @@ void configureI2S() {
       .data_out_num = I2S_PIN_NO_CHANGE,
       .data_in_num = PIN_I2S_SD,
   };
-  i2s_driver_install(I2S_PORT, &config, 0, nullptr);
-  i2s_set_pin(I2S_PORT, &pins);
+  if (i2s_driver_install(I2S_PORT, &config, 0, nullptr) != ESP_OK) {
+    Serial.println("Falha ao instalar o driver I2S.");
+    return false;
+  }
+  if (i2s_set_pin(I2S_PORT, &pins) != ESP_OK) {
+    Serial.println("Falha ao configurar os pinos I2S.");
+    i2s_driver_uninstall(I2S_PORT);
+    return false;
+  }
   i2s_zero_dma_buffer(I2S_PORT);
+  return true;
 }
 
-float readRms() {
+bool readRms(float &rms) {
   int32_t samples[SAMPLE_COUNT];
   size_t bytesRead = 0;
-  if (i2s_read(I2S_PORT, samples, sizeof(samples), &bytesRead, portMAX_DELAY) != ESP_OK) {
-    return 0.0f;
+  if (i2s_read(I2S_PORT, samples, sizeof(samples), &bytesRead,
+               pdMS_TO_TICKS(I2S_READ_TIMEOUT_MS)) != ESP_OK) {
+    Serial.println("Timeout ou erro na leitura I2S.");
+    return false;
   }
 
   const size_t count = bytesRead / sizeof(int32_t);
@@ -72,7 +87,9 @@ float readRms() {
     const int32_t sample = samples[i] >> 8;
     sumSquares += static_cast<double>(sample) * sample;
   }
-  return count == 0 ? 0.0f : sqrt(sumSquares / count);
+  if (count == 0) return false;
+  rms = sqrt(sumSquares / count);
+  return true;
 }
 
 const char *classifyNoise(float rms) {
@@ -109,6 +126,7 @@ void sendReading(float rms) {
     Serial.println("Endpoint inválido.");
     return;
   }
+  http.setTimeout(3000);
   http.addHeader("Content-Type", "application/json");
   const String payload = String("{\"sensor_id\":\"") + SENSOR_ID
       + "\",\"location\":\"" + LOCATION
@@ -127,16 +145,29 @@ void sendReading(float rms) {
 void setup() {
   Serial.begin(115200);
   delay(500);
-  configureI2S();
+  preferences.begin("noise-monitor", false);
+  const uint32_t reservedUntil = preferences.getULong("seq_end", 0);
+  sequenceNumber = reservedUntil;
+  preferences.putULong("seq_end", reservedUntil + SEQUENCE_BLOCK_SIZE);
+
+  while (!configureI2S()) {
+    Serial.println("I2S indisponível; nova tentativa em 5 segundos.");
+    delay(5000);
+  }
   connectWiFi();
   nextSendAt = millis();
 }
 
 void loop() {
   connectWiFi();
-  const float rms = readRms();
+  float rms = 0.0f;
+  const bool sampleReady = readRms(rms);
   if (static_cast<int32_t>(millis() - nextSendAt) >= 0) {
-    sendReading(rms);
+    if (sampleReady) {
+      sendReading(rms);
+    } else {
+      Serial.println("Amostra descartada; nenhuma leitura falsa será enviada.");
+    }
     nextSendAt = millis() + SEND_INTERVAL_MS;
   }
 }

@@ -11,6 +11,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
 import os
+from urllib.parse import urlparse
 import psycopg2
 import psycopg2.extras
 from psycopg2.pool import ThreadedConnectionPool
@@ -18,10 +19,31 @@ from psycopg2.pool import ThreadedConnectionPool
 from silence_policy import policy
 
 
+os.environ.setdefault(
+    "DATABASE_URL",
+    "postgresql://noiseuser:noisepass@localhost:5432/noisedb",
+)
+
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://noiseuser:noisepass@localhost:5432/noisedb",
 )
+
+# Mantém o fallback funcional mesmo quando o arquivo .env não existe.
+DATABASE_URL = os.getenv("DATABASE_URL") or "postgresql://noiseuser:noisepass@localhost:5432/noisedb"
+
+# Fallback final para instalações sem arquivo .env.
+DATABASE_URL = os.getenv("DATABASE_URL") or "postgresql://noiseuser:noisepass@localhost:5432/noisedb"
+
+_configured_url = os.getenv("DATABASE_URL")
+_parsed_url = urlparse(_configured_url or "")
+if not (
+    _parsed_url.scheme in {"postgresql", "postgres"}
+    and _parsed_url.hostname
+    and _parsed_url.username
+    and _parsed_url.password
+):
+    DATABASE_URL = "postgresql://noiseuser:noisepass@localhost:5432/noisedb"
 
 _pool: ThreadedConnectionPool | None = None
 
@@ -113,6 +135,18 @@ class Database:
         try:
             with conn:
                 with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT id
+                        FROM noise_readings
+                        WHERE sensor_id = %s AND sequence = %s
+                        """,
+                        (data.sensor_id, data.sequence),
+                    )
+                    existing = cur.fetchone()
+                    if existing is not None:
+                        return existing[0]
+
                     # Upsert do sensor (cria se não existir)
                     cur.execute(
                         """
@@ -132,6 +166,7 @@ class Database:
                              device_uptime_ms, source_ip, received_at,
                              capture_hour, is_silence_period)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (sensor_id, sequence) DO NOTHING
                         RETURNING id
                         """,
                         (
@@ -147,6 +182,16 @@ class Database:
                         ),
                     )
                     row = cur.fetchone()
+                    if row is None:
+                        cur.execute(
+                            """
+                            SELECT id
+                            FROM noise_readings
+                            WHERE sensor_id = %s AND sequence = %s
+                            """,
+                            (data.sensor_id, data.sequence),
+                        )
+                        row = cur.fetchone()
                     return row[0]
         finally:
             self._put_conn(conn)

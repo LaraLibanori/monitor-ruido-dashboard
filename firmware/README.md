@@ -43,6 +43,10 @@ Grave uma placa por vez com estes valores:
 O computador e os ESP32 devem estar na mesma rede Wi-Fi. O IP da URL é o IP
 do computador, não o IP do celular.
 
+O firmware reserva blocos de sequências na memória flash usando `Preferences`.
+Assim, depois de desligar e ligar a placa, o contador não volta para zero e
+as leituras continuam sendo aceitas pela deduplicação do banco.
+
 ## Teste
 
 Abra o Serial Monitor em **115200 baud**. A placa deve mostrar o próprio IP e
@@ -53,3 +57,10 @@ Se aparecer `HTTP=-1`, confira o IP, o Docker e o firewall do Windows.
 Os limiares RMS (`5000`, `15000`, `30000`) seguem o material fornecido e
 devem ser calibrados no ambiente real, porque dependem do ganho e da posição
 do microfone.
+
+Após gravar, faça este teste em cada placa:
+
+1. Confirme o IP no Serial Monitor.
+2. Confirme pelo menos três respostas `HTTP=200`.
+3. Desligue e ligue a placa.
+4. Confirme que novas respostas `HTTP=200` continuam ocorrendo.
