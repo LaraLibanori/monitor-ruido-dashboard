@@ -30,6 +30,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-noiseuser}:${POSTGRES_PASSWORD:-noisepass}@db:5432/${POSTGRES_DB:-noisedb}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
       RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW:-60}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost,http://127.0.0.1}
       # Lei do silêncio (padrão = convenção do Ed. Letícia)
       APP_TIMEZONE: ${APP_TIMEZONE:-America/Sao_Paulo}
       SILENCE_START_WEEKDAY: ${SILENCE_START_WEEKDAY:-22:00}

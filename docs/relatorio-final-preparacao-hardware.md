@@ -101,6 +101,8 @@ muito_alto  >= 30000
 - `migrations/`: atualizações incrementais do banco.
 - `docker-compose.yaml`: PostgreSQL em `127.0.0.1:5432` e API em `0.0.0.0:5000`.
 - `templates/index.html`: dashboard web.
+- CORS para Flutter Web local: o backend permite `localhost` e `127.0.0.1`
+  com portas variáveis de desenvolvimento, sem habilitar credenciais.
 
 Endpoint usado pelo ESP32:
 

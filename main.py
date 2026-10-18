@@ -15,6 +15,7 @@
 # =============================================
 
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -33,6 +34,19 @@ from app_routes import build_router
 # ---------- CONFIGURAÇÕES ----------
 RATE_LIMIT_MAX    = int(os.getenv("RATE_LIMIT_MAX", 100))
 RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", 60))
+
+# Flutter Web uses a random localhost port during development. Keep the
+# explicit origins for portless requests and use a restricted regex for the
+# variable development ports; credentials are intentionally disabled.
+CORS_ALLOW_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost,http://127.0.0.1",
+    ).split(",")
+    if origin.strip()
+]
+CORS_ALLOW_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 
 # ---------- RATE LIMITING ----------
 # { sensor_id: (count, window_start_ts) }
@@ -82,6 +96,15 @@ app = FastAPI(
     description="Sistema IoT com ESP32 + FastAPI + PostgreSQL + Docker",
     version="5.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ALLOW_ORIGINS,
+    allow_origin_regex=CORS_ALLOW_ORIGIN_REGEX,
+    allow_credentials=False,
+    allow_methods=["GET", "OPTIONS"],
+    allow_headers=["Accept", "Content-Type"],
 )
 
 templates = Jinja2Templates(directory="templates")

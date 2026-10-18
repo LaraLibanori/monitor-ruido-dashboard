@@ -59,6 +59,19 @@ http://192.168.15.8:5000/api/noise
 Não use `localhost` na configuração do ESP32: para a placa, `localhost` é a
 própria placa.
 
+### Flutter Web na rede local
+
+O backend permite requisições CORS de `http://localhost` e
+`http://127.0.0.1`, incluindo portas variáveis usadas pelo Flutter Web, como
+`http://localhost:56536`. A configuração é aplicada automaticamente pelo
+Docker Compose. Se alterar `.env`, recrie o serviço:
+
+```powershell
+docker compose up -d --build app
+```
+
+As rotas GET do aplicativo continuam com o mesmo contrato JSON.
+
 **Nomes das casas:** o app mostra "Casa 1", "Casa 2"... na ordem dos sensores. Para dar outro nome:
 ```
 docker exec -it noise_db psql -U noiseuser -d noisedb -c "UPDATE sensors SET display_name='Casa da Sueli' WHERE sensor_id='sensor_ap2';"
