@@ -1,151 +1,225 @@
-# 📡 Monitor de Ruído — v5 (servidor + app Android)
+# Monitor de Ruído IoT
 
-## ⚡ Guia rápido
+Sistema local de monitoramento de ruído com **ESP32**, **INMP441**,
+**FastAPI**, **PostgreSQL**, **Docker** e aplicativo **Flutter**.
 
-**Hardware (cada ESP32):**
-1. Conecte o INMP441 conforme `firmware/README.md`.
-2. Abra `firmware/esp32_noise_monitor.ino` na Arduino IDE.
-3. Configure Wi-Fi, o IP do computador e o par `SENSOR_ID`/`LOCATION`.
-4. Grave o arquivo nas quatro placas, usando `sensor_ap1` até `sensor_ap4`.
+O projeto coleta somente uma métrica numérica de intensidade sonora (RMS).
+Ele **não grava, transmite ou armazena áudio**.
 
-**Computador (servidor):**
-1. Abra o **Docker Desktop** e espere "Engine running".
-2. Dê dois cliques em **`iniciar.bat`**. Ele cria o `.env` se precisar, sobe tudo e mostra o endereço para o app.
-3. Na primeira vez, se o celular não conectar: botão direito em **`liberar_firewall.bat`** → *Executar como administrador*.
+## Sumário
 
-**Celular:**
-1. Instale o APK (veja `app/README.md` — dá para gerar pelo GitHub sem instalar nada).
-2. Abra o app e digite o endereço que o `iniciar.bat` mostrou (ex.: `192.168.0.10`).
+- [Visão geral](#visão-geral)
+- [Arquitetura](#arquitetura)
+- [Status do projeto](#status-do-projeto)
+- [Pré-requisitos](#pré-requisitos)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Inicialização rápida](#inicialização-rápida)
+- [Configuração](#configuração)
+- [Hardware e firmware](#hardware-e-firmware)
+- [API](#api)
+- [Dashboard Web](#dashboard-web)
+- [Aplicativo Android e Flutter Web](#aplicativo-android-e-flutter-web)
+- [Testes e validação](#testes-e-validação)
+- [Operação e manutenção](#operação-e-manutenção)
+- [Solução de problemas](#solução-de-problemas)
+- [Documentação complementar](#documentação-complementar)
 
-Pronto. Painel web continua em `http://localhost:5000`.
+## Visão geral
 
-## Documento de projeto
+O sistema foi projetado para funcionar exclusivamente na rede local:
 
-O plano completo dos dois produtos de interface está em:
-
-`docs/plano-projeto-dashboard-android.md`
-
-O relatório de preparação para gravação dos ESP32, teste integrado e
-instalação está em:
-
-`docs/relatorio-final-preparacao-hardware.md`
-
-O roteiro de testes do computador, quatro ESP32, Android, calibração e
-estabilidade de 24 horas está em:
-
-`docs/roteiro-validacao-final.md`
-
-Ele separa o trabalho em:
-
-- **Projeto 1 — Dashboard Web**
-- **Projeto 2 — Aplicativo Android**
-
-e registra arquitetura, requisitos, backlog, critérios de aceite, testes,
-dependências e riscos.
-
-Depois de iniciar o servidor, confirme no computador:
-
-```
-http://localhost:5000/health
+```text
+INMP441 -> ESP32 -> Wi-Fi local -> FastAPI -> PostgreSQL
+                                      |-> Dashboard Web
+                                      |-> Aplicativo Android
+                                      |-> Flutter Web
 ```
 
-O resultado esperado é um JSON com `"status": "ok"`. Para os ESP32, use o
-IPv4 mostrado pelo `iniciar.bat`, por exemplo:
+O computador que executa o Docker é o servidor da aplicação. Os ESP32, o
+celular e o computador precisam estar conectados à mesma rede.
 
+### Sensores oficiais
+
+| Sensor | Identificador | Local inicial |
+|---|---|---|
+| 1 | `sensor_ap1` | AP1 |
+| 2 | `sensor_ap2` | AP2 |
+| 3 | `sensor_ap3` | AP3 |
+| 4 | `sensor_ap4` | AP4 |
+
+## Arquitetura
+
+### Backend
+
+- **FastAPI**: API HTTP, validação do payload, rate limiting e dashboard.
+- **PostgreSQL**: armazenamento das leituras e cadastro dos sensores.
+- **Docker Compose**: execução reproduzível do backend e do banco.
+- **Migrations**: atualizações incrementais aplicadas ao iniciar a API.
+- **CORS**: permite o Flutter Web local em `localhost` e `127.0.0.1`,
+  incluindo portas de desenvolvimento variáveis.
+
+### Firmware
+
+Cada ESP32:
+
+1. lê o INMP441 por I2S;
+2. calcula o RMS;
+3. classifica o nível relativo;
+4. conecta ao Wi-Fi;
+5. envia JSON para `POST /api/noise` a cada aproximadamente cinco segundos;
+6. reserva sequências na memória flash para sobreviver a reinicializações.
+
+### Interfaces
+
+- **Dashboard Web**: acompanhamento das leituras, status e histórico recente.
+- **Android**: visão geral das casas, status online/offline e histórico.
+- **Flutter Web**: acesso à API local durante o desenvolvimento, com CORS
+  configurado no backend.
+
+## Status do projeto
+
+### Implementado
+
+- API FastAPI e PostgreSQL em Docker.
+- Quatro sensores cadastrados.
+- Recebimento e validação de leituras.
+- Deduplicação por `(sensor_id, sequence)`.
+- Regras de horário de silêncio.
+- Dashboard Web.
+- Aplicativo Flutter.
+- CORS para desenvolvimento Flutter Web local.
+- Health check e documentação de instalação.
+
+### Validações realizadas
+
+- API local respondendo HTTP 200.
+- Leitura manual aceita por `POST /api/noise`.
+- Leituras reais de ESP32 recebidas com `HTTP=200`.
+- Quatro sensores preparados para uso.
+- Dashboard operando sem dependência obrigatória de CDN.
+
+### Validações dependentes do ambiente
+
+- Compilação final na Arduino IDE instalada pelo usuário.
+- Teste físico de cada ESP32 e INMP441.
+- Calibração dos limiares RMS no local.
+- Instalação e teste do APK em Android físico.
+- Teste integrado contínuo de 24 horas.
+
+Os critérios detalhados estão em `docs/roteiro-validacao-final.md`.
+
+## Pré-requisitos
+
+### Servidor
+
+- Windows 10/11.
+- Docker Desktop com **Engine running**.
+- Computador conectado à rede local.
+- Porta TCP `5000` disponível.
+- Porta TCP `5432` disponível apenas localmente para o PostgreSQL.
+
+### Hardware
+
+- ESP32 DevKit.
+- Microfone digital INMP441.
+- Cabo USB e alimentação adequada.
+- Rede Wi-Fi compatível com o ESP32, normalmente 2,4 GHz.
+
+### Desenvolvimento Android
+
+- Flutter SDK compatível com o `pubspec.yaml`.
+- Android SDK e dispositivo/emulador, para testes Android.
+- Java 17, conforme o workflow de build.
+
+## Estrutura do projeto
+
+```text
+monitor-ruido-v5/
+├── app/                           # Aplicativo Flutter
+├── firmware/                      # Código dos ESP32 e manual
+├── migrations/                    # Migrations PostgreSQL
+├── templates/
+│   └── index.html                 # Dashboard Web
+├── docs/                          # Arquitetura, validação e operação
+├── main.py                        # Aplicação FastAPI
+├── app_routes.py                  # Rotas específicas do app
+├── app_service.py                 # Serviço de apresentação do app
+├── database.py                    # Persistência e migrations
+├── silence_policy.py              # Regras de horário de silêncio
+├── init.sql                       # Schema inicial e sensores
+├── Dockerfile
+├── docker-compose.yaml
+├── requirements.txt
+└── .env.example
 ```
-http://192.168.15.8:5000/api/noise
-```
 
-Não use `localhost` na configuração do ESP32: para a placa, `localhost` é a
-própria placa.
+## Inicialização rápida
 
-### Flutter Web na rede local
-
-O backend permite requisições CORS de `http://localhost` e
-`http://127.0.0.1`, incluindo portas variáveis usadas pelo Flutter Web, como
-`http://localhost:56536`. A configuração é aplicada automaticamente pelo
-Docker Compose. Se alterar `.env`, recrie o serviço:
+Abra um CMD ou PowerShell na raiz do projeto:
 
 ```powershell
-docker compose up -d --build app
+cd D:\OneDrive\Downloads\monitor-ruido-v5\monitor-ruido-v5
+docker compose up -d --build
 ```
 
-As rotas GET do aplicativo continuam com o mesmo contrato JSON.
+Verifique os serviços:
 
-**Nomes das casas:** o app mostra "Casa 1", "Casa 2"... na ordem dos sensores. Para dar outro nome:
-```
-docker exec -it noise_db psql -U noiseuser -d noisedb -c "UPDATE sensors SET display_name='Casa da Sueli' WHERE sensor_id='sensor_ap2';"
-```
-
-**Atualizações do banco** (pasta `migrations/`) são aplicadas sozinhas quando o sistema liga.
-
----
-
-# 📘 Guia detalhado de instalação (Windows)
-
-> Esse guia foi feito para quem **nunca usou Docker antes**. Siga passo a passo com calma!
-
----
-
-## 🧰 O que você vai precisar instalar
-
-### Docker Desktop
-
-O Docker é o programa que vai rodar o sistema. Pense nele como uma "caixinha" que contém tudo que o projeto precisa para funcionar, sem precisar instalar mais nada.
-
-**Como instalar:**
-
-1. Acesse: **https://www.docker.com/products/docker-desktop**
-2. Clique em **"Download for Windows"**
-3. Abra o instalador baixado e clique em **Next** em tudo
-4. Quando terminar, **reinicie o computador**
-5. Abra o **Docker Desktop** pela área de trabalho
-
-> ✅ Você saberá que está funcionando quando aparecer uma barrinha verde no canto inferior esquerdo do Docker Desktop escrito **"Engine running"**
-
----
-
-## 📁 Organizando os arquivos do projeto
-
-Crie uma pasta em qualquer lugar do seu computador — por exemplo na Área de Trabalho — e chame de `noise-monitor`.
-
-Coloque todos os arquivos dentro dela exatamente assim:
-
-```
-noise-monitor/
-├── docker-compose.yaml
-├── Dockerfile
-├── init.sql
-├── .env                ← você vai criar esse (veja abaixo)
-├── requirements.txt
-├── main.py
-├── database.py
-├── silence_policy.py   ← regras da lei do silêncio
-├── app_service.py      ← monta as respostas do app
-├── app_routes.py       ← rotas do app (/api/app/...)
-├── migrations/         ← atualizações automáticas do banco
-├── iniciar.bat
-├── liberar_firewall.bat
-├── app/                ← aplicativo Android (Flutter)
-└── templates/
-    └── index.html
+```powershell
+docker compose ps
 ```
 
-> ⚠️ A pasta `templates` precisa estar dentro de `noise-monitor`, e o `index.html` precisa estar dentro de `templates`.
+O esperado é que `noise_db` e `noise_app` estejam em execução.
 
----
+Teste a API:
 
-## ⚙️ Criando o arquivo `.env`
-
-Esse arquivo guarda as configurações do banco de dados. Você precisa criar ele do zero.
-
-1. Abra o **Bloco de Notas** (pesquise "Bloco de Notas" no menu Iniciar)
-2. Cole esse conteúdo:
-
+```powershell
+curl.exe http://localhost:5000/health
 ```
+
+Resposta esperada:
+
+```json
+{"status":"ok","total_readings":0}
+```
+
+Abra o dashboard em:
+
+```text
+http://localhost:5000
+```
+
+Para acompanhar os logs:
+
+```powershell
+docker compose logs -f app
+```
+
+Para parar os serviços:
+
+```powershell
+docker compose down
+```
+
+> `docker compose down` remove os contêineres, mas preserva o volume
+> `postgres_data`. Para apagar os dados, use `docker compose down -v` somente
+> se essa perda for intencional.
+
+## Configuração
+
+### Arquivo `.env`
+
+Copie o modelo:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edite `.env` conforme o ambiente:
+
+```env
 POSTGRES_DB=noisedb
 POSTGRES_USER=noiseuser
-POSTGRES_PASSWORD=MinhaSenh@2025
+POSTGRES_PASSWORD=troque-esta-senha
 
 RATE_LIMIT_MAX=100
 RATE_LIMIT_WINDOW=60
@@ -154,107 +228,415 @@ APP_TIMEZONE=America/Sao_Paulo
 SILENCE_START_WEEKDAY=22:00
 SILENCE_START_WEEKEND=15:00
 SILENCE_END=09:00
+
+OFFLINE_AFTER_SECONDS=60
+CORS_ALLOW_ORIGINS=http://localhost,http://127.0.0.1
 ```
 
-> 💡 Existe um modelo pronto no arquivo `.env.example`. As quatro linhas do silêncio são opcionais: se não existirem, o sistema usa a convenção do Ed. Letícia (seg–sex 22h–9h, sáb–dom 15h–9h).
+O arquivo `.env` contém configuração local e não deve ser publicado.
 
-3. Clique em **Arquivo → Salvar como**
-4. Navegue até a pasta `noise-monitor`
-5. No campo **"Nome do arquivo"** digite: `.env`
-6. No campo **"Tipo"** selecione: **Todos os arquivos (\*.\*)**
-7. Clique em **Salvar**
+Após alterar variáveis:
 
-> ⚠️ Se salvar como `.env.txt` não vai funcionar! Confira se o nome está exatamente `.env`
-
----
-
-## 🚀 Rodando o projeto
-
-### Passo 1 — Abra o terminal na pasta do projeto
-
-1. Abra o **Explorador de Arquivos**
-2. Navegue até a pasta `noise-monitor`
-3. Clique na **barra de endereço** (onde aparece o caminho, tipo `C:\Users\...`)
-4. Digite `cmd` e aperte **Enter**
-
-Um terminal preto vai abrir já dentro da pasta certa.
-
-### Passo 2 — Suba o projeto
-
-No terminal, digite exatamente esse comando e aperte **Enter**:
-
-```
-docker compose up -d --build
+```powershell
+docker compose up -d --build app
 ```
 
-> ⏳ Na **primeira vez** vai demorar alguns minutos — ele está baixando e configurando tudo. É normal aparecer várias linhas passando na tela.
+### IP do computador na rede local
 
-Quando o cursor voltar, você pode fechar o terminal. O sistema continuará rodando em segundo plano.
+Descubra o IPv4:
 
-### Passo 3 — Verifique no Docker Desktop
-
-Abra o **Docker Desktop**. Você vai ver algo assim:
-
-```
-noise-monitor
-  ├── noise_db    ✅ Running
-  └── noise_app   ✅ Running
+```powershell
+ipconfig
 ```
 
-Se os dois estiverem com ícone verde e escrito **Running**, está tudo funcionando! 🎉
+Exemplo de endereço do servidor:
 
----
-
-## 🌐 Acessando o dashboard
-
-Abra o navegador e acesse:
-
+```text
+192.168.0.139
 ```
+
+Esse endereço será usado pelo ESP32 e pelo celular. Não use `localhost` no
+firmware ou no Android: nesses dispositivos, `localhost` aponta para o próprio
+dispositivo.
+
+## Hardware e firmware
+
+O firmware está em:
+
+```text
+firmware/esp32_noise_monitor.ino
+```
+
+### Ligações do INMP441
+
+| INMP441 | ESP32 |
+|---|---|
+| VDD | 3V3 |
+| GND | GND |
+| WS/LRCL | GPIO25 |
+| SD/DOUT | GPIO33 |
+| SCK/BCLK | GPIO26 |
+| L/R | GND |
+
+Use somente 3,3 V no INMP441.
+
+### Configuração de cada placa
+
+No início do firmware:
+
+```cpp
+const char *WIFI_SSID = "NOME_DA_REDE";
+const char *WIFI_PASSWORD = "SENHA_DA_REDE";
+const char *SERVER_URL = "http://192.168.0.139:5000/api/noise";
+const char *SENSOR_ID = "sensor_ap1";
+const char *LOCATION = "AP1";
+```
+
+Grave cada placa com um identificador exclusivo:
+
+| Placa | `SENSOR_ID` | `LOCATION` |
+|---|---|---|
+| 1 | `sensor_ap1` | `AP1` |
+| 2 | `sensor_ap2` | `AP2` |
+| 3 | `sensor_ap3` | `AP3` |
+| 4 | `sensor_ap4` | `AP4` |
+
+Na Arduino IDE:
+
+1. Instale **esp32 by Espressif Systems**.
+2. Abra o arquivo `.ino`.
+3. Selecione **ESP32 Dev Module**.
+4. Selecione a porta COM.
+5. Clique em **Verify** e depois em **Upload**.
+6. Abra o Serial Monitor em `115200` baud.
+
+Saída esperada:
+
+```text
+Wi-Fi conectado. IP: 192.168.x.x
+RMS=...
+nivel=...
+HTTP=200
+```
+
+### RMS e calibração
+
+Os níveis atuais são relativos ao sinal digital do INMP441:
+
+```text
+baixo       < 5000
+medio       < 15000
+alto        < 30000
+muito_alto  >= 30000
+```
+
+Esses valores **não são decibéis oficiais**. Para calibrar:
+
+1. registre o RMS em silêncio por cinco minutos;
+2. registre o ambiente em condição normal;
+3. registre um ruído alto conhecido;
+4. ajuste `classifyNoise()`;
+5. regrave todas as placas com a mesma tabela;
+6. documente os valores finais.
+
+## API
+
+### Health check
+
+```http
+GET /health
+```
+
+```powershell
+curl.exe http://localhost:5000/health
+```
+
+### Receber leitura do ESP32
+
+```http
+POST /api/noise
+Content-Type: application/json
+```
+
+Exemplo no CMD:
+
+```cmd
+curl.exe -X POST "http://localhost:5000/api/noise" -H "Content-Type: application/json" -d "{\"sensor_id\":\"sensor_ap1\",\"location\":\"AP1\",\"rms\":12345,\"noise_level\":\"medio\",\"sequence\":100000,\"device_uptime_ms\":1000}"
+```
+
+Payload:
+
+```json
+{
+  "sensor_id": "sensor_ap1",
+  "location": "AP1",
+  "rms": 12345.0,
+  "noise_level": "medio",
+  "sequence": 100000,
+  "device_uptime_ms": 1000
+}
+```
+
+### Leituras recentes
+
+```http
+GET /api/readings
+```
+
+```powershell
+curl.exe http://localhost:5000/api/readings
+```
+
+### Visão geral do aplicativo
+
+```http
+GET /api/app/overview
+```
+
+### Histórico de uma casa
+
+```http
+GET /api/app/houses/{sensor_id}/history
+```
+
+Exemplo:
+
+```powershell
+curl.exe http://localhost:5000/api/app/houses/sensor_ap1/history
+```
+
+### CORS para Flutter Web
+
+O backend aceita origens locais como:
+
+```text
+http://localhost:56536
+http://127.0.0.1:56536
+```
+
+Para testar o header:
+
+```powershell
+curl.exe -i -H "Origin: http://localhost:56536" http://localhost:5000/api/app/overview
+```
+
+Procure:
+
+```text
+access-control-allow-origin: http://localhost:56536
+```
+
+## Dashboard Web
+
+Acesse:
+
+```text
 http://localhost:5000
 ```
 
-O painel de monitoramento de ruído vai aparecer.
+O dashboard apresenta:
 
----
+- última leitura recebida;
+- sensor e localização;
+- RMS e classificação;
+- histórico recente;
+- status da API;
+- horário de silêncio;
+- gráfico de intensidade;
+- indicação de leituras durante o horário de silêncio.
 
-## ▶️ Ligar e desligar o sistema
+O dashboard não depende de Tailwind, Chart.js ou Google Fonts externos. O
+gráfico utiliza `canvas` nativo e o layout possui estilos locais de fallback,
+permitindo teste sem internet.
 
-Pelo **Docker Desktop** você não precisa mais abrir terminal nenhum:
+## Aplicativo Android e Flutter Web
 
-| O que fazer | Como fazer no Docker Desktop |
+O código Flutter está em `app/`.
+
+### Desenvolvimento
+
+```powershell
+cd app
+flutter pub get
+flutter analyze
+flutter test
+flutter run
+```
+
+Para executar no Flutter Web:
+
+```powershell
+flutter run -d chrome
+```
+
+Use a URL do servidor local configurado pelo aplicativo:
+
+```text
+http://192.168.0.139:5000
+```
+
+### APK de release
+
+```powershell
+flutter build apk --release
+```
+
+O APK será gerado em:
+
+```text
+app/build/app/outputs/flutter-apk/app-release.apk
+```
+
+No Android físico, computador e celular devem estar na mesma rede. Não use
+`localhost` no celular.
+
+## Testes e validação
+
+### Teste sem hardware
+
+```powershell
+curl.exe http://localhost:5000/health
+curl.exe http://localhost:5000/api/app/overview
+```
+
+Envie uma leitura manual e confirme que ela aparece no dashboard:
+
+```cmd
+curl.exe -X POST "http://localhost:5000/api/noise" -H "Content-Type: application/json" -d "{\"sensor_id\":\"sensor_ap1\",\"location\":\"AP1\",\"rms\":12345,\"noise_level\":\"medio\",\"sequence\":100000,\"device_uptime_ms\":1000}"
+```
+
+### Teste com os quatro ESP32
+
+Para cada placa, confirme:
+
+- Wi-Fi conectado;
+- IP atribuído;
+- RMS variável;
+- pelo menos três respostas `HTTP=200`;
+- leitura visível no dashboard;
+- sequência crescente após reinicialização.
+
+### Teste offline
+
+1. Abra o dashboard com dados disponíveis.
+2. Desconecte o computador da internet.
+3. Atualize com `Ctrl+F5`.
+4. Confirme tabela e gráfico.
+
+### Teste de estabilidade
+
+Depois de validar os quatro sensores:
+
+1. mantenha computador, Docker e roteador ligados;
+2. mantenha os quatro ESP32 alimentados;
+3. registre saúde da API e status dos sensores;
+4. execute o acompanhamento por 24 horas.
+
+O roteiro detalhado e a tabela de acompanhamento estão em
+`docs/roteiro-validacao-final.md`.
+
+## Operação e manutenção
+
+### Ver logs
+
+```powershell
+docker compose logs -f app
+docker compose logs -f db
+```
+
+### Reiniciar a API
+
+```powershell
+docker compose restart app
+```
+
+### Recriar a API após alteração de código
+
+```powershell
+docker compose up -d --build app
+```
+
+### Atualizar migrations
+
+As migrations pendentes são aplicadas automaticamente quando a API inicia.
+Não edite migrations já aplicadas; crie uma nova migration numerada.
+
+### Renomear uma casa
+
+```powershell
+docker exec -it noise_db psql -U noiseuser -d noisedb -c "UPDATE sensors SET display_name='Casa da Sueli' WHERE sensor_id='sensor_ap2';"
+```
+
+## Solução de problemas
+
+### `HTTP=-1` no ESP32
+
+Verifique:
+
+- Docker está em execução;
+- IP do computador está correto;
+- ESP32 e computador estão na mesma rede;
+- firewall permite a porta TCP `5000`;
+- firmware não está usando `localhost`.
+
+### `Wi-Fi não conectado`
+
+Verifique o SSID, a senha e se a rede é compatível com o ESP32.
+
+### `Timeout ou erro na leitura I2S`
+
+Verifique a alimentação de 3,3 V e cada ligação do INMP441:
+`WS`, `SD`, `SCK`, `L/R`, `GND`.
+
+### Flutter Web bloqueado por CORS
+
+Reconstrua a API:
+
+```powershell
+docker compose up -d --build app
+```
+
+Teste:
+
+```powershell
+curl.exe -i -H "Origin: http://localhost:56536" http://localhost:5000/api/app/overview
+```
+
+### Porta 5000 ocupada
+
+Identifique o processo que usa a porta ou altere o mapeamento no
+`docker-compose.yaml`. Se alterar a porta, atualize também o firmware e o
+endereço configurado no aplicativo.
+
+### Sensor aparece offline
+
+O padrão é considerar offline um sensor sem leitura há mais de 60 segundos.
+Verifique o Serial Monitor e o endpoint `/api/app/overview`.
+
+## Documentação complementar
+
+| Documento | Conteúdo |
 |---|---|
-| **Ligar** | Clique no botão ▶️ ao lado de `noise-monitor` |
-| **Desligar** | Clique no botão ⏹️ ao lado de `noise-monitor` |
-| **Ver erros** | Clique em `noise_app` e depois em **Logs** |
+| `firmware/README.md` | Instalação, pinagem e gravação do ESP32 |
+| `docs/plano-projeto-dashboard-android.md` | Arquitetura, requisitos, backlog e critérios |
+| `docs/relatorio-final-preparacao-hardware.md` | Preparação para hardware e instalação |
+| `docs/roteiro-validacao-final.md` | Testes do servidor, sensores, Android e 24 horas |
+| `projeto-1-dashboard/README.md` | Escopo do Dashboard Web |
+| `projeto-2-android/README.md` | Escopo do aplicativo Android |
 
----
+## Segurança e limitações
 
-## ❓ Problemas comuns
+- O sistema foi projetado para rede local, não para exposição direta na
+  internet.
+- O arquivo `.env` não deve ser versionado.
+- O endpoint de ingestão dos sensores não possui autenticação por token nesta
+  versão.
+- O RMS é relativo ao sensor e ao ganho do circuito.
+- Não declare os níveis como decibéis sem calibração com instrumento de
+  referência.
+- Não há captura ou armazenamento de áudio.
 
-**O Docker Desktop não abre ou dá erro na instalação**
-→ Verifique se o Windows está atualizado. O Docker precisa do Windows 10 versão 2004 ou mais recente.
+## Licença
 
-**Aparece erro "port 5000 already in use"**
-→ Algum outro programa está usando a porta 5000. Reinicie o computador e tente de novo.
-
-**O `noise_app` aparece como "Restarting" no Docker Desktop**
-→ Clique nele, vá em **Logs** e veja a mensagem de erro.
-
-**Salvei o `.env` como `.env.txt` sem querer**
-→ Delete o arquivo errado, crie novamente seguindo o passo acima, e depois clique em **Restart** no `noise-monitor` dentro do Docker Desktop.
-
----
-
-## 📌 Resumo rápido
-
-```
-1. Instalar o Docker Desktop
-2. Colocar os arquivos na pasta noise-monitor
-3. Criar o arquivo .env
-4. Abrir cmd na pasta → rodar: docker compose up -d --build
-5. Abrir o navegador em: http://localhost:5000
-```
-
----
-
-*Qualquer dúvida é só perguntar! 😊*
+Este repositório não define uma licença de distribuição. Consulte os
+responsáveis pelo projeto antes de reutilizar ou publicar o código.
