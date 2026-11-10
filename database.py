@@ -19,31 +19,22 @@ from psycopg2.pool import ThreadedConnectionPool
 from silence_policy import policy
 
 
-os.environ.setdefault(
-    "DATABASE_URL",
-    "postgresql://noiseuser:noisepass@localhost:5432/noisedb",
-)
-
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://noiseuser:noisepass@localhost:5432/noisedb",
-)
-
-# Mantém o fallback funcional mesmo quando o arquivo .env não existe.
-DATABASE_URL = os.getenv("DATABASE_URL") or "postgresql://noiseuser:noisepass@localhost:5432/noisedb"
-
-# Fallback final para instalações sem arquivo .env.
-DATABASE_URL = os.getenv("DATABASE_URL") or "postgresql://noiseuser:noisepass@localhost:5432/noisedb"
+# O Docker injeta DATABASE_URL para o serviço da aplicação. Fora do Docker,
+# este fallback permite executar a API contra o PostgreSQL local padrão.
+DEFAULT_DATABASE_URL = "postgresql://noiseuser:noisepass@localhost:5432/noisedb"
+DATABASE_URL = os.getenv("DATABASE_URL") or DEFAULT_DATABASE_URL
 
 _configured_url = os.getenv("DATABASE_URL")
 _parsed_url = urlparse(_configured_url or "")
-if not (
+if _configured_url and not (
     _parsed_url.scheme in {"postgresql", "postgres"}
     and _parsed_url.hostname
     and _parsed_url.username
     and _parsed_url.password
 ):
-    DATABASE_URL = "postgresql://noiseuser:noisepass@localhost:5432/noisedb"
+    raise ValueError(
+        "DATABASE_URL inválida: use postgresql://usuario:senha@host:porta/banco"
+    )
 
 _pool: ThreadedConnectionPool | None = None
 
