@@ -1,7 +1,8 @@
 # 📱 Monitor de Ruído — aplicativo Android
 
 Aplicativo Flutter que lê a API do servidor (Docker) e mostra o barulho de cada casa
-em linguagem simples. Ele **só lê** dados: nunca escreve nada no sistema.
+em linguagem simples. Moradores podem entrar com sua conta para receber notificações
+push e o app registra automaticamente o token FCM no servidor.
 
 ## Jeito 1 — APK pronto pelo GitHub (não precisa instalar nada)
 
@@ -26,13 +27,18 @@ Para testar direto no celular pelo cabo USB (modo desenvolvedor ligado): `flutte
    (algo como `192.168.0.10`).
 2. Abra o app e digite esse endereço. O app testa a conexão antes de salvar.
 3. Celular e computador precisam estar **no mesmo Wi-Fi**.
+4. Toque no ícone de entrada para autenticar com a conta do morador. Para push funcionar
+   em uma instalação própria, configure o Firebase nativo (`google-services.json` no Android
+   e as credenciais equivalentes no iOS); sem essa configuração o app continua funcionando,
+   mas não registra notificações.
 
 ## Estrutura
 
 ```
 lib/
 ├── main.dart              início do app
-├── api.dart               conversa com o servidor + modelos de dados
+├── api.dart               conversa com o servidor + modelos de dados e autenticação
+├── push_registration.dart registra e remove tokens FCM
 ├── noise_ui.dart          tradução "alto" → "Barulhento 😬" + peças visuais
 ├── settings.dart          guarda o endereço do servidor
 └── screens/

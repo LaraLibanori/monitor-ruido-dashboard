@@ -11,6 +11,9 @@ import '../noise_ui.dart';
 import 'connect_screen.dart';
 import 'help_screen.dart';
 import 'house_screen.dart';
+import '../push_registration.dart';
+import '../settings.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.api});
@@ -32,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    PushRegistration.start(widget.api);
     _load();
     _timer = Timer.periodic(_refreshEvery, (_) => _load());
   }
@@ -86,6 +90,11 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Monitor de Ruído', style: TextStyle(fontWeight: FontWeight.w700)),
         actions: [
           IconButton(
+            tooltip: widget.api.authToken == null ? 'Entrar' : 'Sair',
+            icon: Icon(widget.api.authToken == null ? Icons.login : Icons.logout),
+            onPressed: widget.api.authToken == null ? _openLogin : _logout,
+          ),
+          IconButton(
             tooltip: 'Entenda as cores',
             icon: const Icon(Icons.help_outline),
             onPressed: _openHelp,
@@ -99,6 +108,20 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: data == null ? _buildFirstLoad() : _buildContent(data),
     );
+  }
+
+  Future<void> _openLogin() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => LoginScreen(api: widget.api)),
+    );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _logout() async {
+    await PushRegistration.remove(widget.api);
+    await widget.api.logout();
+    await Settings.clearAuthToken();
+    if (mounted) setState(() {});
   }
 
   Widget _buildFirstLoad() {
