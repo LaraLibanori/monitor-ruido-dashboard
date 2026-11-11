@@ -9,6 +9,7 @@ Ele **não grava, transmite ou armazena áudio**.
 ## Sumário
 
 - [Visão geral](#visão-geral)
+- [Versão e histórico](#versão-e-histórico)
 - [Arquitetura](#arquitetura)
 - [Status do projeto](#status-do-projeto)
 - [Pré-requisitos](#pré-requisitos)
@@ -25,6 +26,15 @@ Ele **não grava, transmite ou armazena áudio**.
 - [Documentação complementar](#documentação-complementar)
 
 ## Visão geral
+
+## Versão e histórico
+
+**Versão atual do projeto: `0.5.2`.**
+
+O histórico detalhado de cada versão está em
+[`CHANGELOG.md`](CHANGELOG.md). A versão da API exibida no OpenAPI é um
+identificador separado e pode evoluir independentemente do versionamento
+semântico do projeto.
 
 O sistema foi projetado para funcionar exclusivamente na rede local:
 
