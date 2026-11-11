@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<title>Ativar acesso — Monitor de Ruído</title>
+<style>
+  :root { --green: #00e5a0; --red: #ef4444; --bg: #080c10; --card: #0e1318; --border: #1a2230; --text: #e2e8f0; --muted: #8b98a9; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'DM Sans', Arial, sans-serif; background: var(--bg); color: var(--text); }
+  .card { max-width: 420px; margin: 8vh auto; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px; }
+  h1 { font-size: 1.35rem; margin: 0 0 6px; }
+  .muted { color: var(--muted); } .small { font-size: .88rem; }
+  label { display: block; font-size: .85rem; color: var(--muted); margin: 12px 0 4px; }
+  input { background: #0a1016; color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font: inherit; width: 100%; }
+  button { margin-top: 16px; width: 100%; background: var(--green); color: #04130d; border: 0; border-radius: 10px; padding: 11px; font: inherit; font-weight: 700; cursor: pointer; }
+  button:disabled { opacity: .5; }
+  .error { color: #fecaca; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.4); padding: 9px 12px; border-radius: 10px; margin-top: 12px; }
+  .ok { border-left: 4px solid var(--green); background: rgba(0,229,160,.07); padding: 12px 14px; border-radius: 8px; }
+  .hidden { display: none; }
+  a { color: var(--green); }
+</style>
+</head>
+<body>
+<main class="card">
+  <h1>Monitor de Ruído</h1>
+  <p id="intro" class="muted small">Verificando o convite…</p>
+
+  <form id="form" class="hidden">
+    <label for="email">E-mail de acesso</label>
+    <input id="email" type="email" readonly autocomplete="username">
+    <label for="password">Crie uma senha (mínimo 8 caracteres)</label>
+    <input id="password" type="password" minlength="8" required autocomplete="new-password">
+    <label for="password2">Repita a senha</label>
+    <input id="password2" type="password" minlength="8" required autocomplete="new-password">
+    <button type="submit" id="submit">Ativar acesso</button>
+  </form>
+
+  <div id="error" class="error hidden" role="alert"></div>
+
+  <div id="done" class="ok hidden">
+    <b>Acesso ativado.</b>
+    <p class="small" id="done-text"></p>
+  </div>
+</main>
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const token = new URLSearchParams(location.search).get("token") || "";
+  const fail = (msg) => { $("error").textContent = msg; $("error").classList.remove("hidden"); };
+
+  async function call(path, options) {
+    const res = await fetch(path, options);
+    let data = null;
+    try { data = await res.json(); } catch (_) {}
+    if (!res.ok) {
+      let msg = data && data.detail;
+      if (Array.isArray(msg)) msg = msg.map((d) => d.msg).join("; ");
+      throw new Error(msg || ("Erro " + res.status));
+    }
+    return data;
+  }
+
+  async function start() {
+    if (!token) { $("intro").textContent = ""; return fail("Link de convite incompleto. Abra o link exatamente como recebeu."); }
+    try {
+      const info = await call("/api/auth/invites/" + encodeURIComponent(token));
+      $("intro").textContent = `Olá, ${info.name}! Crie sua senha para ativar o acesso.`;
+      $("email").value = info.email;
+      $("form").classList.remove("hidden");
+      $("password").focus();
+    } catch (e) { $("intro").textContent = ""; fail(e.message); }
+  }
+
+  $("form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    $("error").classList.add("hidden");
+    if ($("password").value !== $("password2").value) return fail("As senhas não conferem.");
+    $("submit").disabled = true;
+    try {
+      const data = await call("/api/auth/invites/accept", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({token, password: $("password").value}),
+      });
+      $("form").classList.add("hidden");
+      $("intro").textContent = "";
+      $("done-text").innerHTML = data.user.role === "admin"
+        ? 'Entre no <a href="/admin">painel de administração</a> com seu e-mail e senha.'
+        : "Abra o aplicativo Monitor de Ruído no celular e entre com seu e-mail e a senha que acabou de criar.";
+      $("done").classList.remove("hidden");
+      history.replaceState(null, "", "/convite");  // tira o token da barra de endereço
+    } catch (e) { fail(e.message); $("submit").disabled = false; }
+  });
+
+  start();
+})();
+</script>
+</body>
+</html>

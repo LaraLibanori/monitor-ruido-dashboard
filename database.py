@@ -8,6 +8,7 @@
 # executa as rotas "def" em threads separadas.
 # =============================================
 
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 import os
@@ -112,6 +113,17 @@ class Database:
 
     def _put_conn(self, conn):
         _pool.putconn(conn)
+
+    @contextmanager
+    def transaction(self):
+        """Cursor (linhas como dict) dentro de uma transação: commit no fim, rollback em erro."""
+        conn = self._get_conn()
+        try:
+            with conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    yield cur
+        finally:
+            self._put_conn(conn)
 
     # --------------------------------------------------
 

@@ -8,20 +8,24 @@
 #   - Servir dashboard HTML e endpoints de leitura
 #   - Informar o status da lei do silêncio (fonte única: silence_policy.py)
 #   - Incluir as rotas do app Android (app_routes.py)
+#   - Login, convites e área do usuário (auth_routes.py)
+#   - Painel do administrador (admin_routes.py + templates/admin.html)
+#   - Disparar alertas de barulho no horário de silêncio (alert_service.py)
 #
 # As rotas são "def" (e não "async def") porque o
 # psycopg2 é síncrono: assim o FastAPI roda cada uma
 # numa thread e o servidor não trava esperando o banco.
 # =============================================
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import BackgroundTasks, FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from typing import Literal
 from contextlib import asynccontextmanager
 from collections import defaultdict
+import logging
 import threading
 import time
 import os
@@ -30,6 +34,19 @@ from database import Database
 from silence_policy import policy
 from app_service import AppService
 from app_routes import build_router
+from user_repository import UserRepository
+from alert_repository import AlertRepository
+from notifications import build_email_provider, build_push_provider
+from alert_service import AlertService
+from auth_service import AuthService, ServiceError
+from auth_deps import build_auth_deps
+from auth_routes import build_auth_router
+from admin_routes import build_admin_router
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 # ---------- CONFIGURAÇÕES ----------
 RATE_LIMIT_MAX    = int(os.getenv("RATE_LIMIT_MAX", 100))
@@ -76,15 +93,27 @@ def _check_rate_limit_unlocked(sensor_id: str) -> tuple[bool, int, int]:
     return True, count + 1, int(RATE_LIMIT_WINDOW - (now - window_start))
 
 
-# ---------- LIFESPAN ----------
+# ---------- SERVIÇOS ----------
 db = Database()
+user_repo = UserRepository(db)
+email_provider = build_email_provider()
+push_provider = build_push_provider()
+alert_service = AlertService(AlertRepository(db), user_repo, email_provider, push_provider)
+auth_service = AuthService(user_repo, email_provider, alert_service)
+auth_deps = build_auth_deps(auth_service)
 
 
+# ---------- LIFESPAN ----------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("🚀 Iniciando sistema...")
     db.connect()
+    auth_service.load_silence_settings()
     print("📦 Banco de dados pronto!")
+    print(f"✉️  E-mail: {email_provider.name} | 📱 Push: {push_provider.name}")
+    if user_repo.count_users() == 0:
+        print("👤 Nenhum usuário ainda. Crie o administrador: "
+              "docker compose exec app python manage.py create-admin")
     yield
     db.disconnect()
     print("🛑 Conexão com banco encerrada.")
@@ -94,7 +123,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Monitor de Ruído ESP32",
     description="Sistema IoT com ESP32 + FastAPI + PostgreSQL + Docker",
-    version="5.0",
+    version="6.0",
     lifespan=lifespan,
 )
 
@@ -102,15 +131,23 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ALLOW_ORIGINS,
     allow_origin_regex=CORS_ALLOW_ORIGIN_REGEX,
-    allow_credentials=False,
-    allow_methods=["GET", "OPTIONS"],
-    allow_headers=["Accept", "Content-Type"],
+    allow_credentials=False,  # o login usa token Bearer, não cookie
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Accept", "Content-Type", "Authorization"],
 )
 
 templates = Jinja2Templates(directory="templates")
 
-# Rotas do aplicativo Android (/api/app/...)
-app.include_router(build_router(AppService(db)))
+
+@app.exception_handler(ServiceError)
+async def service_error_handler(request: Request, exc: ServiceError):
+    return JSONResponse(status_code=exc.status, content={"detail": exc.message})
+
+
+# Rotas do aplicativo (/api/app/...), login/usuário e administração
+app.include_router(build_router(AppService(db), auth_deps.app_user))
+app.include_router(build_auth_router(auth_service, alert_service, auth_deps))
+app.include_router(build_admin_router(auth_service, alert_service, auth_deps))
 
 
 # ---------- MODELOS ----------
@@ -126,7 +163,7 @@ class NoiseData(BaseModel):
 # ---------- ENDPOINTS ----------
 
 @app.post("/api/noise", summary="Recebe leitura de um sensor")
-def receive_noise(data: NoiseData, request: Request):
+def receive_noise(data: NoiseData, request: Request, background: BackgroundTasks):
     # Rate limit
     allowed, count, remaining = check_rate_limit(data.sensor_id)
     if not allowed:
@@ -145,6 +182,10 @@ def receive_noise(data: NoiseData, request: Request):
     source_ip = request.client.host if request.client else "unknown"
 
     reading_id = db.save_reading(data, source_ip)
+
+    # Alerta (se for o caso) depois da resposta: o ESP32 não espera o envio
+    if data.noise_level in ("alto", "muito_alto"):
+        background.add_task(alert_service.process_reading, reading_id)
 
     return {
         "status": "success",
@@ -195,6 +236,22 @@ def dashboard(request: Request):
     readings = db.get_readings(limit=30)
     return templates.TemplateResponse(
         "index.html", {"request": request, "readings": readings}
+    )
+
+
+@app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
+def admin_page(request: Request):
+    return templates.TemplateResponse(
+        "admin.html", {"request": request}, headers={"Cache-Control": "no-store"}
+    )
+
+
+@app.get("/convite", response_class=HTMLResponse, include_in_schema=False)
+def invite_page(request: Request):
+    # O token do convite está na URL: não vazar por Referer nem cache
+    return templates.TemplateResponse(
+        "convite.html", {"request": request},
+        headers={"Referrer-Policy": "no-referrer", "Cache-Control": "no-store"},
     )
 
 

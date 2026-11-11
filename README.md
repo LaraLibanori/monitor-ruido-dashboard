@@ -89,6 +89,13 @@ Cada ESP32:
 - Aplicativo Flutter.
 - CORS para desenvolvimento Flutter Web local.
 - Health check e documentação de instalação.
+- Login com papéis `admin` e `morador`, convites com validade e sessões com expiração.
+- Painel de administração em `/admin`: moradores, casas/sensores, horário de
+  silêncio, alertas e auditoria.
+- Alertas de barulho no horário de silêncio por push (FCM) e e-mail (SMTP),
+  sem duplicar, respeitando casa, preferências e usuários inativos.
+- Modo simulado para e-mail e push quando não há credenciais.
+- Testes automatizados (API + PostgreSQL) e smoke test do Docker no CI.
 
 ### Validações realizadas
 
@@ -100,6 +107,9 @@ Cada ESP32:
 
 ### Validações dependentes do ambiente
 
+- Envio real de e-mail (exige credenciais SMTP) e de push (exige projeto
+  Firebase): sem credenciais, os envios são apenas simulados.
+- HTTPS para uso fora da rede local.
 - Compilação final na Arduino IDE instalada pelo usuário.
 - Teste físico de cada ESP32 e INMP441.
 - Calibração dos limiares RMS no local.
@@ -232,6 +242,10 @@ SILENCE_END=09:00
 OFFLINE_AFTER_SECONDS=60
 CORS_ALLOW_ORIGINS=http://localhost,http://127.0.0.1
 ```
+
+Defina também `SECRET_KEY` (protege os tokens de login). As variáveis de
+login, e-mail (SMTP) e push (Firebase) estão explicadas em
+[`docs/usuarios-e-notificacoes.md`](docs/usuarios-e-notificacoes.md).
 
 O arquivo `.env` contém configuração local e não deve ser publicado.
 
@@ -405,6 +419,17 @@ Exemplo:
 curl.exe http://localhost:5000/api/app/houses/sensor_ap1/history
 ```
 
+### Login, administração e notificações
+
+```powershell
+docker compose exec app python manage.py create-admin
+```
+
+Depois abra `http://SEU-IP:5000/admin`. Rotas `/api/auth/*`, `/api/me/*` e
+`/api/admin/*`, passo a passo de cadastro de moradores, convites e
+configuração de e-mail/push:
+[`docs/usuarios-e-notificacoes.md`](docs/usuarios-e-notificacoes.md).
+
 ### CORS para Flutter Web
 
 O backend aceita origens locais como:
@@ -535,6 +560,16 @@ Depois de validar os quatro sensores:
 O roteiro detalhado e a tabela de acompanhamento estão em
 `docs/roteiro-validacao-final.md`.
 
+### Testes automatizados
+
+```powershell
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
+python scripts/smoke_test.py http://localhost:5000 admin@exemplo.com SENHA
+```
+
+Detalhes em [`docs/usuarios-e-notificacoes.md`](docs/usuarios-e-notificacoes.md#testes).
+
 ## Operação e manutenção
 
 ### Ver logs
@@ -621,6 +656,7 @@ Verifique o Serial Monitor e o endpoint `/api/app/overview`.
 | `docs/plano-projeto-dashboard-android.md` | Arquitetura, requisitos, backlog e critérios |
 | `docs/relatorio-final-preparacao-hardware.md` | Preparação para hardware e instalação |
 | `docs/roteiro-validacao-final.md` | Testes do servidor, sensores, Android e 24 horas |
+| `docs/usuarios-e-notificacoes.md` | Login, moradores, convites, alertas, e-mail/push e rotas |
 | `projeto-1-dashboard/README.md` | Escopo do Dashboard Web |
 | `projeto-2-android/README.md` | Escopo do aplicativo Android |
 
@@ -631,6 +667,12 @@ Verifique o Serial Monitor e o endpoint `/api/app/overview`.
 - O arquivo `.env` não deve ser versionado.
 - O endpoint de ingestão dos sensores não possui autenticação por token nesta
   versão.
+- A administração (`/admin`, `/api/admin/*`) exige login; o painel de
+  leituras `/`, `/api/readings` e `/api/sensors` continuam abertos na rede local.
+- O tráfego é HTTP: senhas e tokens só ficam protegidos dentro da rede local.
+  Para acesso externo, coloque HTTPS na frente antes de expor.
+- E-mail e push só são enviados de verdade com credenciais SMTP/Firebase
+  configuradas; sem elas, os envios aparecem como "simulado".
 - O RMS é relativo ao sensor e ao ganho do circuito.
 - Não declare os níveis como decibéis sem calibração com instrumento de
   referência.

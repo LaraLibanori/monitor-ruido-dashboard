@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="data:,">
+<title>Administração — Monitor de Ruído</title>
+<style>
+  :root {
+    --green: #00e5a0; --yellow: #fbbf24; --orange: #f97316; --red: #ef4444; --blue: #60a5fa;
+    --bg: #080c10; --card: #0e1318; --card2: #121a22; --border: #1a2230;
+    --text: #e2e8f0; --muted: #8b98a9;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'DM Sans', Arial, sans-serif; background: var(--bg); color: var(--text); }
+  a { color: var(--green); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  h1 { font-size: 1.4rem; margin: 0; }
+  h2 { font-size: 1.1rem; margin: 0 0 12px; }
+  .muted { color: var(--muted); }
+  .small { font-size: .85rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .grow { flex: 1; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .tab { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 8px 14px; border-radius: 999px; cursor: pointer; }
+  .tab[aria-selected="true"] { background: var(--green); color: #04130d; border-color: var(--green); font-weight: 700; }
+  button, .btn { background: var(--card2); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; cursor: pointer; font: inherit; }
+  button.primary { background: var(--green); color: #04130d; border-color: var(--green); font-weight: 700; }
+  button.danger { border-color: var(--red); color: #fecaca; }
+  button:disabled { opacity: .5; cursor: default; }
+  input, select, textarea { background: #0a1016; color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; font: inherit; width: 100%; }
+  label { display: block; font-size: .85rem; color: var(--muted); margin: 10px 0 4px; }
+  label.check { display: flex; gap: 8px; align-items: center; color: var(--text); margin: 6px 0; }
+  label.check input { width: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .78rem; border: 1px solid var(--border); margin: 1px 2px 1px 0; }
+  .ok { color: var(--green); border-color: rgba(0,229,160,.4); }
+  .warn { color: var(--yellow); border-color: rgba(251,191,36,.4); }
+  .bad { color: var(--red); border-color: rgba(239,68,68,.4); }
+  .info { color: var(--blue); border-color: rgba(96,165,250,.4); }
+  .notice { border-left: 4px solid var(--yellow); background: rgba(251,191,36,.07); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; }
+  .notice.ok { border-color: var(--green); background: rgba(0,229,160,.07); color: var(--text); }
+  .error { color: #fecaca; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.4); padding: 8px 12px; border-radius: 10px; margin-top: 10px; }
+  .hidden { display: none !important; }
+  .login { max-width: 380px; margin: 10vh auto; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 14px; }
+  .sensors-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 2px 12px; }
+  dialog { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 16px; width: min(640px, 94vw); padding: 20px; }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  .linkbox { display: flex; gap: 8px; margin-top: 8px; }
+  .linkbox input { font-family: Consolas, monospace; font-size: .8rem; }
+  .table-wrap { overflow-x: auto; }
+  @media (max-width: 720px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ LOGIN ============ -->
+  <section id="login-view" class="login card hidden" aria-labelledby="login-title">
+    <h1 id="login-title">Administração</h1>
+    <p class="muted small">Monitor de Ruído — entre com sua conta de administrador.</p>
+    <form id="login-form">
+      <label for="login-email">E-mail</label>
+      <input id="login-email" type="email" autocomplete="username" required>
+      <label for="login-password">Senha</label>
+      <input id="login-password" type="password" autocomplete="current-password" required>
+      <div class="row" style="margin-top:14px"><button class="primary grow" type="submit">Entrar</button></div>
+      <div id="login-error" class="error hidden" role="alert"></div>
+    </form>
+    <p class="muted small" style="margin-top:16px">Primeiro acesso? Crie o administrador no servidor:<br>
+      <code>docker compose exec app python manage.py create-admin</code></p>
+    <p class="small"><a href="/">← Voltar ao painel de leituras</a></p>
+  </section>
+
+  <!-- ============ APP ============ -->
+  <section id="app-view" class="hidden">
+    <header>
+      <div>
+        <h1>Administração</h1>
+        <div class="muted small" id="who"></div>
+      </div>
+      <div class="row">
+        <a class="btn" href="/">Painel de leituras</a>
+        <button id="logout">Sair</button>
+      </div>
+    </header>
+
+    <div id="provider-notice" class="notice hidden"></div>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="users" aria-selected="true">Moradores</button>
+      <button class="tab" role="tab" data-tab="sensors" aria-selected="false">Casas e sensores</button>
+      <button class="tab" role="tab" data-tab="silence" aria-selected="false">Horário de silêncio</button>
+      <button class="tab" role="tab" data-tab="alerts" aria-selected="false">Alertas</button>
+      <button class="tab" role="tab" data-tab="audit" aria-selected="false">Auditoria</button>
+    </nav>
+
+    <!-- Moradores -->
+    <section id="tab-users" class="card">
+      <div class="row" style="margin-bottom:10px">
+        <h2 class="grow" style="margin:0">Moradores e administradores</h2>
+        <button class="primary" id="new-user">+ Cadastrar morador</button>
+      </div>
+      <div id="invite-result" class="notice ok hidden"></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Nome</th><th>Contato</th><th>Casas</th><th>Alertas</th><th>Status</th><th></th></tr></thead>
+        <tbody id="users-body"></tbody>
+      </table></div>
+    </section>
+
+    <!-- Sensores -->
+    <section id="tab-sensors" class="card hidden">
+      <h2>Casas e sensores</h2>
+      <p class="muted small">O <b>local</b> vem do firmware do ESP32 e é atualizado a cada leitura; use o <b>nome no app</b> para renomear a casa.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Sensor</th><th>Nome no app</th><th>Local</th><th>Moradores</th><th>Última leitura</th><th>Ativo</th><th></th></tr></thead>
+        <tbody id="sensors-body"></tbody>
+      </table></div>
+      <form id="sensor-form" class="card" style="margin-top:16px;background:var(--card2)">
+        <h2>Cadastrar sensor</h2>
+        <div class="grid3">
+          <div><label for="s-id">Identificador (igual ao firmware)</label><input id="s-id" required placeholder="sensor_ap5" pattern="[A-Za-z0-9_.\-]{1,100}"></div>
+          <div><label for="s-location">Local</label><input id="s-location" required placeholder="AP5"></div>
+          <div><label for="s-name">Nome no app (opcional)</label><input id="s-name" placeholder="Casa 5"></div>
+        </div>
+        <div class="row" style="margin-top:12px"><button class="primary" type="submit">Cadastrar sensor</button></div>
+        <div id="sensor-error" class="error hidden" role="alert"></div>
+      </form>
+    </section>
+
+    <!-- Silêncio -->
+    <section id="tab-silence" class="card hidden">
+      <h2>Horário de silêncio</h2>
+      <p class="muted small">Vale para as próximas leituras e alertas. Fuso: <span id="tz"></span>.</p>
+      <form id="silence-form">
+        <div class="grid3">
+          <div><label for="sil-weekday">Início (seg–sex)</label><input id="sil-weekday" type="time" required></div>
+          <div><label for="sil-weekend">Início (sáb–dom)</label><input id="sil-weekend" type="time" required></div>
+          <div><label for="sil-end">Fim (todos os dias)</label><input id="sil-end" type="time" required></div>
+        </div>
+        <div class="row" style="margin-top:12px"><button class="primary" type="submit">Salvar horário</button><span id="silence-ok" class="pill ok hidden">Salvo</span></div>
+        <div id="silence-error" class="error hidden" role="alert"></div>
+      </form>
+    </section>
+
+    <!-- Alertas -->
+    <section id="tab-alerts" class="card hidden">
+      <div class="row" style="margin-bottom:10px"><h2 class="grow" style="margin:0">Alertas recentes</h2><button id="reload-alerts">Atualizar</button></div>
+      <p class="muted small">Um alerta é criado quando um sensor registra nível <b>alto</b> ou <b>muito alto</b> no horário de silêncio. Para não repetir a cada leitura, o mesmo sensor só gera novo alerta após <span id="cooldown"></span> minutos.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Quando</th><th>Casa</th><th>Nível</th><th>Envios</th></tr></thead>
+        <tbody id="alerts-body"></tbody>
+      </table></div>
+    </section>
+
+    <!-- Auditoria -->
+    <section id="tab-audit" class="card hidden">
+      <h2>Auditoria</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Alvo</th></tr></thead>
+        <tbody id="audit-body"></tbody>
+      </table></div>
+    </section>
+  </section>
+</div>
+
+<!-- ============ DIÁLOGO DE USUÁRIO ============ -->
+<dialog id="user-dialog" aria-labelledby="user-dialog-title">
+  <form id="user-form" method="dialog">
+    <h2 id="user-dialog-title">Cadastrar morador</h2>
+    <div class="grid2">
+      <div><label for="u-name">Nome</label><input id="u-name" required maxlength="120"></div>
+      <div><label for="u-role">Papel</label>
+        <select id="u-role"><option value="morador">Morador</option><option value="admin">Administrador</option></select></div>
+      <div><label for="u-email">E-mail</label><input id="u-email" type="email" required></div>
+      <div><label for="u-phone">Telefone (opcional)</label><input id="u-phone" type="tel" placeholder="11 91234-5678"></div>
+    </div>
+    <label>Casas/sensores que pode ver e de que recebe alerta</label>
+    <div id="u-sensors" class="sensors-pick"></div>
+    <label>Alertas por</label>
+    <label class="check"><input type="checkbox" id="u-push" checked> Notificação no celular (push)</label>
+    <label class="check"><input type="checkbox" id="u-mail" checked> E-mail</label>
+    <div id="u-invite-wrap">
+      <label for="u-invite">Enviar convite por</label>
+      <select id="u-invite"><option value="email">E-mail (link enviado automaticamente)</option><option value="phone">Telefone (você compartilha o link)</option></select>
+    </div>
+    <label class="check hidden" id="u-active-wrap"><input type="checkbox" id="u-active"> Acesso ativo</label>
+    <div id="user-error" class="error hidden" role="alert"></div>
+    <div class="row" style="margin-top:16px;justify-content:flex-end">
+      <button type="button" id="user-cancel">Cancelar</button>
+      <button class="primary" type="submit" id="user-save">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const TOKEN_KEY = "monitor_admin_token";
+  let token = null;
+  let me = null;
+  let sensors = [];
+  let users = [];
+  let editingId = null;
+
+  // ---------- utilidades ----------
+  const store = {
+    get() { try { return sessionStorage.getItem(TOKEN_KEY); } catch (_) { return null; } },
+    set(v) { try { v ? sessionStorage.setItem(TOKEN_KEY, v) : sessionStorage.removeItem(TOKEN_KEY); } catch (_) {} },
+  };
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const fmt = (iso) => iso ? new Date(iso).toLocaleString("pt-BR", {dateStyle: "short", timeStyle: "short"}) : "—";
+  const show = (el, on = true) => el.classList.toggle("hidden", !on);
+  const setError = (el, msg) => { el.textContent = msg || ""; show(el, !!msg); };
+  const sensorLabel = (id) => { const s = sensors.find((x) => x.sensor_id === id); return s ? (s.display_name || s.location || id) : id; };
+
+  async function api(path, options = {}) {
+    const headers = {"Accept": "application/json", ...(options.headers || {})};
+    if (options.body !== undefined) headers["Content-Type"] = "application/json";
+    if (token) headers["Authorization"] = "Bearer " + token;
+    const res = await fetch(path, {...options, headers, body: options.body !== undefined ? JSON.stringify(options.body) : undefined});
+    if (res.status === 401 && path !== "/api/auth/login") { logout(false); throw new Error("Sessão expirada. Entre novamente."); }
+    if (res.status === 204) return null;
+    let data = null;
+    try { data = await res.json(); } catch (_) {}
+    if (!res.ok) {
+      let msg = data && data.detail;
+      if (Array.isArray(msg)) msg = msg.map((d) => d.msg).join("; ");
+      throw new Error(msg || ("Erro " + res.status));
+    }
+    return data;
+  }
+
+  // ---------- sessão ----------
+  async function start() {
+    token = store.get();
+    if (!token) return showLogin();
+    try {
+      me = await api("/api/auth/me");
+      if (me.role !== "admin") { await api("/api/auth/logout", {method: "POST"}).catch(() => {}); throw new Error("Esta conta não é de administrador."); }
+      showApp();
+    } catch (e) { store.set(null); token = null; showLogin(e.message); }
+  }
+  function showLogin(msg) { show($("app-view"), false); show($("login-view")); setError($("login-error"), msg); $("login-email").focus(); }
+  function showApp() {
+    show($("login-view"), false); show($("app-view"));
+    $("who").textContent = `${me.name} · ${me.email}`;
+    loadAll();
+  }
+  function logout(callApi = true) {
+    if (callApi && token) api("/api/auth/logout", {method: "POST"}).catch(() => {});
+    token = null; me = null; store.set(null); showLogin();
+  }
+  $("login-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    setError($("login-error"), "");
+    try {
+      const data = await api("/api/auth/login", {method: "POST", body: {email: $("login-email").value, password: $("login-password").value}});
+      if (data.user.role !== "admin") { token = data.token; await api("/api/auth/logout", {method: "POST"}).catch(() => {}); token = null; throw new Error("Esta conta não é de administrador. Use o aplicativo."); }
+      token = data.token; store.set(token); me = data.user; $("login-password").value = "";
+      showApp();
+    } catch (e) { setError($("login-error"), e.message); }
+  });
+  $("logout").addEventListener("click", () => logout());
+
+  // ---------- abas ----------
+  document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+    ["users", "sensors", "silence", "alerts", "audit"].forEach((name) => show($("tab-" + name), name === tab.dataset.tab));
+    if (tab.dataset.tab === "alerts") loadAlerts();
+    if (tab.dataset.tab === "audit") loadAudit();
+  }));
+
+  async function loadAll() {
+    try {
+      await Promise.all([loadSensors(), loadProviders(), loadSilence()]);
+      await loadUsers();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function loadProviders() {
+    const st = await api("/api/admin/notifications/status");
+    $("cooldown").textContent = st.cooldown_minutes;
+    const missing = [];
+    if (!st.email_real) missing.push("e-mail (configure SMTP_HOST, SMTP_USER, SMTP_PASSWORD)");
+    if (!st.push_real) missing.push("push (configure FCM_CREDENTIALS_PATH)");
+    const box = $("provider-notice");
+    if (missing.length) {
+      box.innerHTML = "<b>Modo de demonstração:</b> " + esc(missing.join(" e ")) +
+        " ainda não tem credenciais. Os envios desses canais são <b>simulados</b> e aparecem como “simulado” no histórico — nada é enviado de verdade.";
+      show(box);
+    } else show(box, false);
+  }
+
+  // ---------- usuários ----------
+  function statusPill(u) {
+    if (u.status === "ativo") return '<span class="pill ok">Ativo</span>';
+    if (u.status === "convite_pendente") return `<span class="pill warn">Convite pendente</span><div class="muted small">até ${esc(fmt(u.invite_expires_at))}</div>`;
+    return '<span class="pill bad">Inativo</span>';
+  }
+  async function loadUsers() {
+    users = await api("/api/admin/users");
+    $("users-body").innerHTML = users.map((u) => `
+      <tr>
+        <td><b>${esc(u.name)}</b>${u.role === "admin" ? ' <span class="pill info">Admin</span>' : ""}</td>
+        <td>${esc(u.email)}${u.phone ? `<div class="muted small">${esc(u.phone)}</div>` : ""}</td>
+        <td>${u.sensor_ids.length ? u.sensor_ids.map((s) => `<span class="pill">${esc(sensorLabel(s))}</span>`).join("") : '<span class="muted small">nenhuma</span>'}</td>
+        <td>${u.notifications.push ? `<span class="pill">Push · ${u.devices} aparelho(s)</span>` : ""}${u.notifications.email ? '<span class="pill">E-mail</span>' : ""}${!u.notifications.push && !u.notifications.email ? '<span class="muted small">desligados</span>' : ""}</td>
+        <td>${statusPill(u)}</td>
+        <td><div class="row" style="gap:6px">
+          <button data-act="edit" data-id="${u.id}">Editar</button>
+          ${u.status === "convite_pendente" ? `<button data-act="invite" data-id="${u.id}">Novo convite</button>` : ""}
+          ${u.status === "ativo" ? `<button data-act="test" data-id="${u.id}">Testar alerta</button>` : ""}
+          ${u.id !== me.id ? `<button data-act="toggle" data-id="${u.id}" class="${u.active ? "danger" : ""}">${u.active ? "Desativar" : "Reativar"}</button>` : ""}
+        </div></td>
+      </tr>`).join("") || '<tr><td colspan="6" class="muted">Nenhum usuário.</td></tr>';
+  }
+  $("users-body").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button[data-act]");
+    if (!btn) return;
+    const user = users.find((u) => u.id === Number(btn.dataset.id));
+    btn.disabled = true;
+    try {
+      if (btn.dataset.act === "edit") openUserDialog(user);
+      if (btn.dataset.act === "toggle") {
+        if (user.active && !confirm(`Desativar ${user.name}? A pessoa perde o acesso e deixa de receber alertas.`)) return;
+        await api(`/api/admin/users/${user.id}`, {method: "PATCH", body: {active: !user.active}});
+        await loadUsers();
+      }
+      if (btn.dataset.act === "invite") {
+        const channel = user.phone && confirm("Enviar por telefone (você compartilha o link)?\nOK = telefone · Cancelar = e-mail") ? "phone" : "email";
+        showInvite(user, await api(`/api/admin/users/${user.id}/invite`, {method: "POST", body: {channel}}));
+        await loadUsers();
+      }
+      if (btn.dataset.act === "test") {
+        const res = await api(`/api/admin/users/${user.id}/notifications/test`, {method: "POST"});
+        alert("Resultado do teste:\n" + res.results.map((r) => `• ${r.channel}: ${r.status}${r.detail ? " — " + r.detail : ""}`).join("\n"));
+      }
+    } catch (e) { alert(e.message); } finally { btn.disabled = false; }
+  });
+
+  function showInvite(user, invite) {
+    const d = invite.delivery;
+    const how = d.channel === "email"
+      ? (d.status === "sent" ? `Convite enviado por e-mail para <b>${esc(user.email)}</b>.`
+        : d.status === "simulated" ? `SMTP não configurado: o e-mail <b>não</b> foi enviado. Envie o link abaixo para <b>${esc(user.email)}</b>.`
+        : `Falha ao enviar o e-mail (${esc(d.detail)}). Envie o link abaixo manualmente.`)
+      : `Envie o link abaixo para <b>${esc(user.phone)}</b> (WhatsApp/SMS).`;
+    const box = $("invite-result");
+    box.innerHTML = `${how} Válido até ${esc(fmt(invite.expires_at))}.
+      <div class="linkbox"><input readonly id="invite-link" aria-label="Link do convite"><button type="button" id="copy-invite">Copiar</button></div>`;
+    $("invite-link").value = invite.invite_url;
+    $("copy-invite").onclick = async () => {
+      try { await navigator.clipboard.writeText(invite.invite_url); $("copy-invite").textContent = "Copiado"; }
+      catch (_) { $("invite-link").select(); }
+    };
+    show(box);
+  }
+
+  function openUserDialog(user = null) {
+    editingId = user ? user.id : null;
+    $("user-dialog-title").textContent = user ? "Editar " + user.name : "Cadastrar morador";
+    $("u-name").value = user ? user.name : "";
+    $("u-email").value = user ? user.email : "";
+    $("u-phone").value = user ? (user.phone || "") : "";
+    $("u-role").value = user ? user.role : "morador";
+    $("u-role").disabled = !!user && user.id === me.id;
+    $("u-push").checked = user ? user.notifications.push : true;
+    $("u-mail").checked = user ? user.notifications.email : true;
+    $("u-active").checked = user ? user.active : true;
+    show($("u-active-wrap"), !!user && user.id !== me.id);
+    show($("u-invite-wrap"), !user);
+    const chosen = new Set(user ? user.sensor_ids : []);
+    $("u-sensors").innerHTML = sensors.map((s) => `
+      <label class="check"><input type="checkbox" value="${esc(s.sensor_id)}" ${chosen.has(s.sensor_id) ? "checked" : ""}>
+      ${esc(s.display_name || s.location)} <span class="muted small">(${esc(s.sensor_id)})</span></label>`).join("");
+    setError($("user-error"), "");
+    $("user-dialog").showModal();
+    $("u-name").focus();
+  }
+  $("new-user").addEventListener("click", () => openUserDialog());
+  $("user-cancel").addEventListener("click", () => $("user-dialog").close());
+  $("user-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const body = {
+      name: $("u-name").value, email: $("u-email").value, phone: $("u-phone").value || null,
+      sensor_ids: [...$("u-sensors").querySelectorAll("input:checked")].map((i) => i.value),
+      notifications: {push: $("u-push").checked, email: $("u-mail").checked},
+    };
+    if (!$("u-role").disabled) body.role = $("u-role").value;
+    $("user-save").disabled = true;
+    try {
+      if (editingId) {
+        if (editingId !== me.id) body.active = $("u-active").checked;
+        await api(`/api/admin/users/${editingId}`, {method: "PATCH", body});
+      } else {
+        body.invite_channel = $("u-invite").value;
+        const created = await api("/api/admin/users", {method: "POST", body});
+        showInvite(created.user, created.invite);
+      }
+      $("user-dialog").close();
+      await Promise.all([loadUsers(), loadSensors()]);
+    } catch (e) { setError($("user-error"), e.message); }
+    finally { $("user-save").disabled = false; }
+  });
+
+  // ---------- sensores ----------
+  async function loadSensors() {
+    sensors = await api("/api/admin/sensors");
+    $("sensors-body").innerHTML = sensors.map((s) => `
+      <tr data-sensor="${esc(s.sensor_id)}">
+        <td><code>${esc(s.sensor_id)}</code></td>
+        <td><input class="s-display" value="${esc(s.display_name || "")}" placeholder="(automático)" aria-label="Nome no app de ${esc(s.sensor_id)}"></td>
+        <td>${esc(s.location)}</td>
+        <td>${s.residents.length ? s.residents.map((r) => `<span class="pill">${esc(r)}</span>`).join("") : '<span class="muted small">nenhum</span>'}</td>
+        <td class="small">${esc(fmt(s.last_reading_at))}</td>
+        <td><input type="checkbox" class="s-active" ${s.active ? "checked" : ""} aria-label="Sensor ativo"></td>
+        <td><button class="s-save">Salvar</button></td>
+      </tr>`).join("");
+  }
+  $("sensors-body").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest(".s-save");
+    if (!btn) return;
+    const row = btn.closest("tr");
+    btn.disabled = true;
+    try {
+      await api(`/api/admin/sensors/${encodeURIComponent(row.dataset.sensor)}`, {method: "PATCH", body: {
+        display_name: row.querySelector(".s-display").value, active: row.querySelector(".s-active").checked}});
+      btn.textContent = "Salvo";
+      await loadSensors();
+    } catch (e) { alert(e.message); } finally { btn.disabled = false; }
+  });
+  $("sensor-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    setError($("sensor-error"), "");
+    try {
+      await api("/api/admin/sensors", {method: "POST", body: {
+        sensor_id: $("s-id").value.trim(), location: $("s-location").value, display_name: $("s-name").value || null}});
+      $("sensor-form").reset();
+      await loadSensors();
+    } catch (e) { setError($("sensor-error"), e.message); }
+  });
+
+  // ---------- silêncio ----------
+  async function loadSilence() {
+    const r = await api("/api/admin/settings/silence");
+    $("sil-weekday").value = r.weekday_start; $("sil-weekend").value = r.weekend_start; $("sil-end").value = r.end;
+    $("tz").textContent = r.timezone;
+  }
+  $("silence-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    setError($("silence-error"), ""); show($("silence-ok"), false);
+    try {
+      await api("/api/admin/settings/silence", {method: "PUT", body: {
+        weekday_start: $("sil-weekday").value, weekend_start: $("sil-weekend").value, end: $("sil-end").value}});
+      show($("silence-ok"));
+    } catch (e) { setError($("silence-error"), e.message); }
+  });
+
+  // ---------- alertas e auditoria ----------
+  const statusClass = {sent: "ok", simulated: "warn", failed: "bad", skipped: ""};
+  const statusText = {sent: "enviado", simulated: "simulado", failed: "falhou", skipped: "não enviado"};
+  async function loadAlerts() {
+    const events = await api("/api/admin/alerts?limit=50");
+    $("alerts-body").innerHTML = events.map((e) => `
+      <tr>
+        <td class="small">${esc(fmt(e.created_at))}</td>
+        <td>${esc(e.house_name)} <span class="muted small">(${esc(e.sensor_id)})</span></td>
+        <td><span class="pill ${e.noise_level === "muito_alto" ? "bad" : "warn"}">${e.noise_level === "muito_alto" ? "Muito alto" : "Alto"}</span></td>
+        <td>${e.deliveries.length ? e.deliveries.map((d) => `<div class="small"><span class="pill ${statusClass[d.status]}">${esc(statusText[d.status] || d.status)}</span> ${esc(d.channel)} → ${esc(d.user_name || "?")} ${d.detail ? `<span class="muted">· ${esc(d.detail)}</span>` : ""}</div>`).join("") : '<span class="muted small">Nenhum morador vinculado a esta casa.</span>'}</td>
+      </tr>`).join("") || '<tr><td colspan="4" class="muted">Nenhum alerta ainda.</td></tr>';
+  }
+  $("reload-alerts").addEventListener("click", () => loadAlerts().catch((e) => alert(e.message)));
+  async function loadAudit() {
+    const rows = await api("/api/admin/audit?limit=100");
+    $("audit-body").innerHTML = rows.map((a) => `
+      <tr><td class="small">${esc(fmt(a.created_at))}</td><td>${esc(a.actor_name || "sistema")}</td>
+      <td><code>${esc(a.action)}</code></td><td class="small">${esc(a.target || "")}</td></tr>`).join("");
+  }
+
+  start();
+})();
+</script>
+</body>
+</html>

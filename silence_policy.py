@@ -21,12 +21,21 @@ import os
 
 
 def _parse_hhmm(value: str) -> time:
-    """Converte '22:00' em datetime.time(22, 0)."""
-    hours, minutes = value.strip().split(":")
-    return time(int(hours), int(minutes))
+    """Converte '22:00' em datetime.time(22, 0). ValueError se inválido."""
+    try:
+        hours, minutes = value.strip().split(":")
+        if not (1 <= len(hours) <= 2) or len(minutes) != 2:
+            raise ValueError
+        return time(int(hours), int(minutes))
+    except (ValueError, AttributeError):
+        raise ValueError(f"Horário inválido: {value!r}. Use HH:MM (ex.: 22:00).") from None
 
 
-@dataclass(frozen=True)
+def format_hhmm(value: time) -> str:
+    return f"{value:%H:%M}"
+
+
+@dataclass
 class SilencePolicy:
     tz_name: str
     weekday_start: time   # início do silêncio de segunda a sexta
@@ -45,6 +54,19 @@ class SilencePolicy:
             weekend_start=_parse_hhmm(os.getenv("SILENCE_START_WEEKEND", "15:00")),
             end=_parse_hhmm(os.getenv("SILENCE_END", "09:00")),
         )
+
+    def update(self, *, weekday_start: str, weekend_start: str, end: str) -> None:
+        """Troca os horários em tempo de execução (painel do administrador)."""
+        parsed = (_parse_hhmm(weekday_start), _parse_hhmm(weekend_start), _parse_hhmm(end))
+        self.weekday_start, self.weekend_start, self.end = parsed
+
+    def rules(self) -> dict:
+        return {
+            "weekday_start": format_hhmm(self.weekday_start),
+            "weekend_start": format_hhmm(self.weekend_start),
+            "end": format_hhmm(self.end),
+            "timezone": self.tz_name,
+        }
 
     def to_local(self, moment: datetime) -> datetime:
         """Converte qualquer datetime (com fuso) para o horário do condomínio."""
