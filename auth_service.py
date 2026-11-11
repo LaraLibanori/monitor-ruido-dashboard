@@ -26,6 +26,8 @@ SESSION_TTL_HOURS = float(os.getenv("SESSION_TTL_HOURS", 12))
 INVITE_TTL_HOURS = float(os.getenv("INVITE_TTL_HOURS", 72))
 LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", 5))
 LOGIN_LOCK_SECONDS = int(os.getenv("LOGIN_LOCK_SECONDS", 15 * 60))
+LOGIN_IP_MAX_FAILURES = int(os.getenv("LOGIN_IP_MAX_FAILURES", LOGIN_MAX_FAILURES))
+LOGIN_MAX_TRACKED_KEYS = int(os.getenv("LOGIN_MAX_TRACKED_KEYS", 10_000))
 
 ROLES = ("admin", "morador")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -91,25 +93,51 @@ def public_user(user: dict) -> dict:
 
 
 class _LoginThrottle:
-    """Bloqueia tentativas de senha em sequência (por IP + e-mail)."""
+    """Bloqueia tentativas de senha por credencial e por endereço IP."""
 
-    def __init__(self):
+    def __init__(self, max_tracked_keys: int = LOGIN_MAX_TRACKED_KEYS):
         self._failures: dict[str, list[float]] = defaultdict(list)
+        self._ip_failures: dict[str, list[float]] = defaultdict(list)
+        self._max_tracked_keys = max(1, max_tracked_keys)
         self._lock = threading.Lock()
 
-    def _recent(self, key: str, now: float) -> list[float]:
-        recent = [t for t in self._failures[key] if now - t < LOGIN_LOCK_SECONDS]
-        self._failures[key] = recent
+    @staticmethod
+    def _recent(failures: dict[str, list[float]], key: str, now: float) -> list[float]:
+        values = failures.get(key)
+        if not values:
+            return []
+        recent = [t for t in values if now - t < LOGIN_LOCK_SECONDS]
+        if recent:
+            failures[key] = recent
+        else:
+            failures.pop(key, None)
         return recent
 
-    def check(self, key: str) -> None:
+    def _prune(self, now: float) -> None:
+        for failures in (self._failures, self._ip_failures):
+            for key in list(failures):
+                self._recent(failures, key, now)
+            while len(failures) > self._max_tracked_keys:
+                oldest = min(failures, key=lambda item: failures[item][0])
+                failures.pop(oldest, None)
+
+    def check(self, key: str, client_ip: str) -> None:
         with self._lock:
-            if len(self._recent(key, time.time())) >= LOGIN_MAX_FAILURES:
+            now = time.time()
+            self._prune(now)
+            if (
+                len(self._recent(self._failures, key, now)) >= LOGIN_MAX_FAILURES
+                or len(self._recent(self._ip_failures, client_ip, now)) >= LOGIN_IP_MAX_FAILURES
+            ):
                 raise ServiceError(429, "Muitas tentativas. Aguarde alguns minutos e tente de novo.")
 
-    def fail(self, key: str) -> None:
+    def fail(self, key: str, client_ip: str) -> None:
         with self._lock:
-            self._recent(key, time.time()).append(time.time())
+            now = time.time()
+            self._prune(now)
+            self._failures.setdefault(key, []).append(now)
+            self._ip_failures.setdefault(client_ip, []).append(now)
+            self._prune(now)
 
     def reset(self, key: str) -> None:
         with self._lock:
@@ -128,11 +156,11 @@ class AuthService:
     def login(self, email: str, password: str, client_ip: str = "?") -> dict:
         email = (email or "").strip().lower()
         key = f"{client_ip}|{email}"
-        self._throttle.check(key)
+        self._throttle.check(key, client_ip)
         row = self.users.get_login_row(email) if email else None
         ok = bool(row) and row["active"] and security.verify_password(password or "", row["password_hash"])
         if not ok:
-            self._throttle.fail(key)
+            self._throttle.fail(key, client_ip)
             self.users.add_audit(row["id"] if row else None, "login_falhou", email, {"ip": client_ip})
             raise ServiceError(401, "E-mail ou senha incorretos.")
         self._throttle.reset(key)

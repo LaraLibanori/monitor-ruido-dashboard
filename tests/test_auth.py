@@ -24,6 +24,30 @@ def test_login_bloqueia_apos_varias_falhas(client, admin):
     assert blocked.status_code == 429
 
 
+def test_login_bloqueia_spray_de_emails_do_mesmo_ip(client, admin):
+    for index in range(5):
+        response = client.post(
+            "/api/auth/login",
+            json={"email": f"desconhecido-{index}@exemplo.com", "password": "errada123"},
+        )
+        assert response.status_code == 401
+    blocked = client.post(
+        "/api/auth/login",
+        json={"email": "admin@exemplo.com", "password": "senha-admin-1"},
+    )
+    assert blocked.status_code == 429
+
+
+def test_login_throttle_nao_cria_chaves_vazias_e_limita_chaves():
+    throttle = main.auth_service._throttle.__class__(max_tracked_keys=2)
+    throttle.check("ip|um@exemplo.com", "ip")
+    assert not throttle._failures
+    for index in range(3):
+        throttle.fail(f"ip|{index}@exemplo.com", "ip")
+    assert len(throttle._failures) == 2
+    assert len(throttle._ip_failures) == 1
+
+
 def test_email_nao_diferencia_maiusculas(client, admin):
     ok = client.post("/api/auth/login", json={"email": "ADMIN@Exemplo.com", "password": "senha-admin-1"})
     assert ok.status_code == 200

@@ -78,6 +78,7 @@ def clean_state(client):
     main.alert_service.push = push
     main.auth_service.email = email
     main.auth_service._throttle._failures.clear()
+    main.auth_service._throttle._ip_failures.clear()
     main._rate_store.clear()
     policy.update(weekday_start="22:00", weekend_start="15:00", end="09:00")
     yield
