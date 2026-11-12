@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Apresentação executiva do Monitor de Ruído IoT">
+  <title>Monitor de Ruído | Apresentação</title>
+  <style>
+    :root {
+      --bg: #07111f; --panel: rgba(15, 29, 49, .86); --panel-strong: #10233b;
+      --line: rgba(148, 163, 184, .16); --text: #e7eef8; --muted: #91a4bc;
+      --cyan: #38d9ff; --mint: #57e6b1; --amber: #ffc857; --red: #ff6b7a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+      BlinkMacSystemFont, "Segoe UI", sans-serif; background:
+      radial-gradient(circle at 75% -10%, rgba(56, 217, 255, .18), transparent 36rem),
+      radial-gradient(circle at -10% 35%, rgba(87, 230, 177, .12), transparent 30rem), var(--bg);
+    }
+    a { color: inherit; text-decoration: none; }
+    .shell { max-width: 1240px; margin: auto; padding: 28px 24px 48px; }
+    .nav { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+    .brand { display: flex; gap: 12px; align-items: center; font-weight: 800; letter-spacing: -.02em; }
+    .mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px;
+      color: #042238; background: linear-gradient(135deg, var(--cyan), var(--mint)); font-weight: 900; }
+    .nav-links { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: .88rem; }
+    .nav-links a { padding: 9px 12px; border-radius: 9px; }
+    .nav-links a:hover { color: var(--text); background: rgba(255,255,255,.07); }
+    .hero { display: grid; grid-template-columns: 1.15fr .85fr; gap: 34px; padding: 78px 0 54px; align-items: center; }
+    .eyebrow { color: var(--cyan); text-transform: uppercase; letter-spacing: .16em; font-weight: 800; font-size: .72rem; }
+    h1 { font-size: clamp(2.5rem, 6vw, 5.4rem); line-height: .96; letter-spacing: -.075em; margin: 14px 0 22px; max-width: 740px; }
+    .hero p { color: var(--muted); font-size: 1.1rem; line-height: 1.7; max-width: 650px; margin: 0; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .button { display: inline-flex; align-items: center; gap: 8px; padding: 12px 16px; border-radius: 10px;
+      border: 1px solid var(--line); background: rgba(255,255,255,.04); font-weight: 700; font-size: .9rem; }
+    .button.primary { color: #042238; border-color: transparent; background: linear-gradient(135deg, var(--cyan), var(--mint)); }
+    .button:hover { transform: translateY(-1px); }
+    .hero-art { min-height: 310px; position: relative; display: grid; place-items: center; }
+    .orb { width: 240px; height: 240px; border-radius: 50%; border: 1px solid rgba(56,217,255,.35);
+      box-shadow: 0 0 90px rgba(56,217,255,.2), inset 0 0 60px rgba(87,230,177,.09); position: relative; }
+    .orb:before, .orb:after { content: ""; position: absolute; inset: 28px; border: 1px solid rgba(87,230,177,.35); border-radius: 50%; }
+    .orb:after { inset: 64px; background: radial-gradient(circle, rgba(87,230,177,.8), rgba(56,217,255,.15) 48%, transparent 70%); border: 0; }
+    .signal { position: absolute; width: 340px; height: 340px; border: 1px dashed rgba(56,217,255,.28); border-radius: 50%; animation: spin 18s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .section { margin-top: 34px; }
+    .section-head { display: flex; justify-content: space-between; gap: 16px; align-items: end; margin-bottom: 16px; }
+    h2 { font-size: 1.45rem; letter-spacing: -.035em; margin: 0; }
+    .section-head p { margin: 0; color: var(--muted); font-size: .9rem; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .card { border: 1px solid var(--line); background: linear-gradient(145deg, rgba(16,35,59,.9), rgba(9,24,42,.8));
+      border-radius: 16px; padding: 20px; box-shadow: 0 18px 50px rgba(0,0,0,.12); }
+    .metric-label { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; }
+    .metric-value { font-size: 2rem; font-weight: 800; letter-spacing: -.05em; margin-top: 10px; }
+    .metric-note { color: var(--muted); font-size: .78rem; margin-top: 6px; }
+    .online { color: var(--mint); } .warning { color: var(--amber); } .danger { color: var(--red); }
+    .grid-2 { display: grid; grid-template-columns: 1.1fr .9fr; gap: 14px; }
+    .architecture { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; align-items: center; margin-top: 22px; }
+    .node { min-height: 84px; display: grid; place-items: center; text-align: center; padding: 10px;
+      border: 1px solid rgba(56,217,255,.24); border-radius: 12px; background: rgba(56,217,255,.06); font-size: .82rem; }
+    .arrow { text-align: center; color: var(--cyan); font-size: 1.2rem; }
+    .sensor-list { display: grid; gap: 9px; margin-top: 16px; }
+    .sensor { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px;
+      border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.025); }
+    .sensor-name { font-weight: 700; font-size: .9rem; } .sensor-meta { color: var(--muted); font-size: .76rem; margin-top: 3px; }
+    .status { display: flex; gap: 7px; align-items: center; font-size: .78rem; color: var(--muted); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .dot.online { background: var(--mint); box-shadow: 0 0 0 4px rgba(87,230,177,.12); }
+    .dot.offline { background: var(--red); }
+    .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .pillar h3 { margin: 13px 0 8px; font-size: 1rem; } .pillar p { color: var(--muted); line-height: 1.55; font-size: .86rem; margin: 0; }
+    .icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: var(--cyan); background: rgba(56,217,255,.1); }
+    .footer { margin-top: 50px; border-top: 1px solid var(--line); padding-top: 18px; color: var(--muted); font-size: .8rem;
+      display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .loading { color: var(--muted); font-size: .85rem; }
+    @media (max-width: 860px) { .hero, .grid-2 { grid-template-columns: 1fr; } .hero { padding-top: 52px; } .hero-art { min-height: 240px; } }
+    @media (max-width: 680px) { .metrics, .pillars { grid-template-columns: repeat(2, 1fr); } .architecture { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); } .nav-links a:nth-child(-n+2) { display: none; } }
+    @media (max-width: 440px) { .metrics, .pillars { grid-template-columns: 1fr; } .shell { padding-inline: 16px; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <nav class="nav" aria-label="Navegação principal">
+      <a class="brand" href="/"><span class="mark">∿</span><span>Monitor de Ruído <small style="color:var(--muted);font-weight:600">/ IoT</small></span></a>
+      <div class="nav-links"><a href="#produto">Produto</a><a href="#arquitetura">Arquitetura</a><a href="/admin">Administração</a><a href="/">Painel ao vivo</a></div>
+    </nav>
+
+    <section class="hero" id="produto">
+      <div>
+        <div class="eyebrow">Projeto IoT · versão 0.6.0</div>
+        <h1>Ruído medido.<br><span style="color:var(--cyan)">Decisões melhores.</span></h1>
+        <p>Uma plataforma local que transforma sinais de quatro sensores ESP32 em visibilidade operacional, alertas responsáveis e histórico acionável — sem gravar ou armazenar áudio.</p>
+        <div class="actions"><a class="button primary" href="/">Abrir painel ao vivo →</a><a class="button" href="/docs" target="_blank" rel="noreferrer">Ver API OpenAPI ↗</a></div>
+      </div>
+      <div class="hero-art" aria-hidden="true"><div class="signal"></div><div class="orb"></div></div>
+    </section>
+
+    <section class="section" aria-labelledby="status-title">
+      <div class="section-head"><div><h2 id="status-title">Visão executiva</h2><p>Indicadores atualizados a partir da API deste ambiente.</p></div><span class="loading" id="updated-at">Atualizando...</span></div>
+      <div class="metrics">
+        <article class="card"><div class="metric-label">Sensores cadastrados</div><div class="metric-value" id="sensor-count">—</div><div class="metric-note">pontos monitorados</div></article>
+        <article class="card"><div class="metric-label">Sensores online</div><div class="metric-value online" id="online-count">—</div><div class="metric-note">comunicação recente</div></article>
+        <article class="card"><div class="metric-label">Leituras disponíveis</div><div class="metric-value" id="reading-count">—</div><div class="metric-note">histórico retornado pela API</div></article>
+        <article class="card"><div class="metric-label">Lei do silêncio</div><div class="metric-value" id="silence-state">—</div><div class="metric-note" id="silence-note">consultando política</div></article>
+      </div>
+    </section>
+
+    <section class="section grid-2" id="arquitetura">
+      <article class="card"><div class="section-head"><div><h2>Como funciona</h2><p>Do sensor à ação administrativa.</p></div></div>
+        <div class="architecture"><div class="node">INMP441<br><small>métrica RMS</small></div><div class="arrow">→</div><div class="node">ESP32<br><small>Wi-Fi local</small></div><div class="arrow">→</div><div class="node">FastAPI<br><small>regras e API</small></div></div>
+        <div class="architecture" style="grid-template-columns:1fr 1fr 1fr;margin-top:8px"><div class="node">PostgreSQL<br><small>histórico</small></div><div class="node">Web + Android<br><small>acompanhamento</small></div><div class="node">SMTP / FCM<br><small>alertas opcionais</small></div></div>
+      </article>
+      <article class="card"><h2>Estado dos pontos</h2><div id="sensor-list" class="sensor-list"><span class="loading">Carregando sensores...</span></div></article>
+    </section>
+
+    <section class="section"><div class="section-head"><div><h2>O que o projeto entrega</h2><p>Uma base pronta para demonstrar, operar e evoluir.</p></div></div>
+      <div class="pillars">
+        <article class="card pillar"><div class="icon">◉</div><h3>Monitoramento em tempo real</h3><p>Leituras, status online/offline, horário de silêncio e histórico recente em uma interface local e responsiva.</p></article>
+        <article class="card pillar"><div class="icon">✓</div><h3>Governança e acesso</h3><p>Login, convites, papéis admin/morador, associação por casa, auditoria e painel de administração.</p></article>
+        <article class="card pillar"><div class="icon">↗</div><h3>Resposta orientada por regras</h3><p>Ocorrências contínuas, advertências, reformas autorizadas, candidatas a multa e notificações rastreáveis.</p></article>
+      </div>
+    </section>
+
+    <section class="section card"><div class="section-head"><div><h2>Privacidade por desenho</h2><p>Clareza técnica para uma apresentação responsável.</p></div></div>
+      <div class="grid-2" style="gap:26px"><p style="color:var(--muted);line-height:1.7;margin:0">O sistema não captura, transmite ou armazena áudio. O ESP32 calcula uma métrica numérica de intensidade (RMS) e envia somente o resultado classificado. Isso reduz exposição de dados e mantém o foco no evento operacional.</p><p style="color:var(--muted);line-height:1.7;margin:0"><strong style="color:var(--text)">Limites conhecidos:</strong> SMTP/FCM reais dependem de credenciais externas; a instalação foi desenhada para rede local; RMS não equivale a decibéis oficiais sem calibração.</p></div>
+    </section>
+
+    <footer class="footer"><span>Monitor de Ruído IoT · FastAPI · PostgreSQL · Flutter · ESP32</span><span id="api-status">API: verificando</span></footer>
+  </main>
+  <script>
+    const text = (id, value) => document.getElementById(id).textContent = value;
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char]));
+    async function loadPresentation() {
+      try {
+        const [health, sensors, overview] = await Promise.all([
+          fetch('/health').then(r => r.json()),
+          fetch('/api/sensors').then(r => r.json()),
+          fetch('/api/app/overview').then(r => r.json())
+        ]);
+        const houses = overview.houses || [];
+        text('sensor-count', sensors.length);
+        text('online-count', houses.filter(h => h.online).length);
+        text('reading-count', health.total_readings ?? '—');
+        text('silence-state', overview.silence && overview.silence.is_silence_period ? 'Ativo' : 'Normal');
+        text('silence-note', overview.silence && overview.silence.is_silence_period ? 'período de silêncio vigente' : 'fora do período de silêncio');
+        text('updated-at', `Atualizado às ${new Date().toLocaleTimeString('pt-BR')}`);
+        text('api-status', 'API: operacional');
+        const list = document.getElementById('sensor-list');
+        list.innerHTML = houses.length ? houses.map(h => {
+          const level = h.last_reading?.noise_level || 'sem leitura';
+          return `<div class="sensor"><div><div class="sensor-name">${escapeHtml(h.name || h.location)}</div><div class="sensor-meta">${escapeHtml(h.location)} · ${escapeHtml(h.sensor_id)} · ${escapeHtml(level.replace('_',' '))}</div></div><div class="status"><span class="dot ${h.online ? 'online' : 'offline'}"></span>${h.online ? 'online' : 'offline'}</div></div>`;
+        }).join('') : '<span class="loading">Nenhum sensor cadastrado.</span>';
+      } catch (error) {
+        text('api-status', 'API: indisponível');
+        text('updated-at', 'Não foi possível atualizar');
+        document.getElementById('sensor-list').innerHTML = '<span class="loading danger">Não foi possível consultar os sensores.</span>';
+      }
+    }
+    loadPresentation();
+    setInterval(loadPresentation, 30000);
+  </script>
+</body>
+</html>

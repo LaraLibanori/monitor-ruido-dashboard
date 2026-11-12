@@ -27,11 +27,16 @@ class AppService:
     def __init__(self, db: Database):
         self.db = db
 
-    def overview(self) -> dict:
-        """Tela inicial: status do silêncio + uma entrada por casa."""
+    def overview(self, allowed: set[str] | None = None) -> dict:
+        """Tela inicial: status do silêncio + uma entrada por casa.
+
+        allowed = None mostra todas; um conjunto limita às casas do morador.
+        """
         day_start_utc, _ = policy.day_bounds_utc(policy.today())
         houses = []
         for row in self.db.get_houses_overview(day_start_utc):
+            if allowed is not None and row["sensor_id"] not in allowed:
+                continue
             seconds = row["seconds_since_last"]
             has_reading = seconds is not None
             houses.append({
@@ -52,9 +57,11 @@ class AppService:
             })
         return {"silence": policy.status(), "houses": houses}
 
-    def history(self, sensor_id: str, day: date | None = None) -> dict:
+    def history(self, sensor_id: str, day: date | None = None,
+                allowed: set[str] | None = None) -> dict:
         """Tela da casa: 24 barras (uma por hora) do dia escolhido."""
-        house = self.db.get_house(sensor_id)
+        # Casa de outro morador responde igual a casa inexistente (não revela que existe)
+        house = self.db.get_house(sensor_id) if allowed is None or sensor_id in allowed else None
         if house is None:
             raise HouseNotFound(sensor_id)
 

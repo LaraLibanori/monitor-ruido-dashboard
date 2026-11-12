@@ -38,6 +38,26 @@ services:
       SILENCE_END: ${SILENCE_END:-09:00}
       # App: sem leitura há mais que isso (segundos) = "sem sinal"
       OFFLINE_AFTER_SECONDS: ${OFFLINE_AFTER_SECONDS:-60}
+      # Login e sessões (defina SECRET_KEY no .env para as sessões sobreviverem a reinícios)
+      SECRET_KEY: ${SECRET_KEY:-}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-12}
+      INVITE_TTL_HOURS: ${INVITE_TTL_HOURS:-72}
+      APP_REQUIRE_AUTH: ${APP_REQUIRE_AUTH:-false}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      # Ocorrências contínuas: gap, advertência e candidata a multa
+      NOISE_CONTINUITY_GAP_SECONDS: ${NOISE_CONTINUITY_GAP_SECONDS:-15}
+      NOISE_WARNING_SECONDS: ${NOISE_WARNING_SECONDS:-120}
+      NOISE_FINE_SECONDS: ${NOISE_FINE_SECONDS:-300}
+      # E-mail (vazio = modo simulado, nada é enviado)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      # Push: caminho DENTRO do container (a pasta ./secrets é montada em /run/secrets)
+      FCM_CREDENTIALS_PATH: ${FCM_CREDENTIALS_PATH:-}
+    volumes:
+      - ./secrets:/run/secrets:ro
     depends_on:
       db:
         condition: service_healthy

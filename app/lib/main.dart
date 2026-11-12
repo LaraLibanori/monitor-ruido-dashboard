@@ -17,14 +17,16 @@ import 'settings.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final savedServer = await Settings.loadServer();
-  runApp(MonitorApp(savedServer: savedServer));
+  final authToken = await Settings.loadAuthToken();
+  runApp(MonitorApp(savedServer: savedServer, authToken: authToken));
 }
 
 class MonitorApp extends StatelessWidget {
-  const MonitorApp({super.key, this.savedServer});
+  const MonitorApp({super.key, this.savedServer, this.authToken});
 
   /// Endereço salvo da última vez (null na primeira abertura).
   final String? savedServer;
+  final String? authToken;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +35,9 @@ class MonitorApp extends StatelessWidget {
       title: 'Monitor de Ruído',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      home: server == null ? const ConnectScreen() : HomeScreen(api: ApiClient(server)),
+      home: server == null
+          ? const ConnectScreen()
+          : HomeScreen(api: ApiClient(server, authToken: authToken)),
     );
   }
 }

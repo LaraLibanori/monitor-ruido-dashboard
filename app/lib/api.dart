@@ -1,9 +1,10 @@
 // =============================================
 // api.dart - Conversa com o servidor (FastAPI no Docker)
 // =============================================
-// O app só LÊ dados. Rotas usadas:
+// Rotas usadas:
 //   GET /api/app/overview
 //   GET /api/app/houses/{sensor_id}/history
+//   POST /api/auth/login, /api/me/devices e /api/me/devices/remove
 // =============================================
 
 import 'dart:async';
@@ -21,7 +22,8 @@ class ApiException implements Exception {
 }
 
 int _toInt(dynamic value) => value == null ? 0 : (value as num).toInt();
-double? _toDouble(dynamic value) => value == null ? null : (value as num).toDouble();
+double? _toDouble(dynamic value) =>
+    value == null ? null : (value as num).toDouble();
 Map<String, dynamic> _map(dynamic value) =>
     value is Map<String, dynamic> ? value : const <String, dynamic>{};
 
@@ -30,7 +32,8 @@ Map<String, dynamic> _map(dynamic value) =>
 // ---------------------------------------------
 
 class NextChange {
-  NextChange({required this.at, required this.dayOffset, required this.silenceStarts});
+  NextChange(
+      {required this.at, required this.dayOffset, required this.silenceStarts});
 
   final String at; // "22:00"
   final int dayOffset; // 0 = hoje, 1 = amanhã
@@ -193,15 +196,53 @@ class History {
   }
 }
 
+class NotificationRecord {
+  NotificationRecord({
+    required this.kind,
+    required this.channel,
+    required this.status,
+    required this.detail,
+    required this.createdAt,
+    required this.sensorId,
+    required this.stage,
+    required this.noiseLevel,
+    required this.rms,
+  });
+
+  final String kind;
+  final String channel;
+  final String status;
+  final String? detail;
+  final String createdAt;
+  final String? sensorId;
+  final String? stage;
+  final String? noiseLevel;
+  final double? rms;
+
+  factory NotificationRecord.fromJson(Map<String, dynamic> json) =>
+      NotificationRecord(
+        kind: (json['kind'] as String?) ?? '',
+        channel: (json['channel'] as String?) ?? '',
+        status: (json['status'] as String?) ?? '',
+        detail: json['detail'] as String?,
+        createdAt: (json['created_at'] as String?) ?? '',
+        sensorId: json['sensor_id'] as String?,
+        stage: json['stage'] as String?,
+        noiseLevel: json['noise_level'] as String?,
+        rms: _toDouble(json['rms']),
+      );
+}
+
 // ---------------------------------------------
 // Cliente HTTP
 // ---------------------------------------------
 
 class ApiClient {
-  ApiClient(this.baseUrl);
+  ApiClient(this.baseUrl, {this.authToken});
 
   /// Ex.: http://192.168.0.10:5000
   final String baseUrl;
+  String? authToken;
 
   static const _timeout = Duration(seconds: 6);
 
@@ -242,8 +283,66 @@ class ApiClient {
   }
 
   Future<History> history(String sensorId) async {
-    final json = await _get('/api/app/houses/${Uri.encodeComponent(sensorId)}/history');
+    final json =
+        await _get('/api/app/houses/${Uri.encodeComponent(sensorId)}/history');
     return History.fromJson(json);
+  }
+
+  Future<List<NotificationRecord>> notifications() async {
+    final values = await _getList('/api/me/notifications');
+    return values
+        .whereType<Map<String, dynamic>>()
+        .map(NotificationRecord.fromJson)
+        .toList();
+  }
+
+  Future<String> login(String email, String password) async {
+    final response = await _request(
+      'POST',
+      Uri.parse('$baseUrl/api/auth/login'),
+      {'email': email, 'password': password},
+    );
+    if (response.statusCode != 200) {
+      throw ApiException('E-mail ou senha incorretos.');
+    }
+    final data = _decodeMap(response);
+    final token = data['token'];
+    if (token is! String || token.isEmpty) {
+      throw ApiException('O servidor não devolveu uma sessão válida.');
+    }
+    authToken = token;
+    return token;
+  }
+
+  Future<void> registerDevice(String token, String platform) async {
+    final response = await _request(
+      'POST',
+      Uri.parse('$baseUrl/api/me/devices'),
+      {'token': token, 'platform': platform},
+    );
+    if (response.statusCode != 204) {
+      throw ApiException('Não foi possível registrar as notificações.');
+    }
+  }
+
+  Future<void> removeDevice(String token) async {
+    final response = await _request(
+      'POST',
+      Uri.parse('$baseUrl/api/me/devices/remove'),
+      {'token': token},
+    );
+    if (response.statusCode != 204 && response.statusCode != 401) {
+      throw ApiException('Não foi possível remover as notificações.');
+    }
+  }
+
+  Future<void> logout() async {
+    final response =
+        await _request('POST', Uri.parse('$baseUrl/api/auth/logout'), null);
+    if (response.statusCode != 204 && response.statusCode != 401) {
+      throw ApiException('Não foi possível encerrar a sessão.');
+    }
+    authToken = null;
   }
 
   Future<Map<String, dynamic>> _get(String path) async {
@@ -260,7 +359,8 @@ class ApiClient {
       );
     }
     if (response.statusCode != 200) {
-      throw ApiException('O servidor respondeu com erro ${response.statusCode}.');
+      throw ApiException(
+          'O servidor respondeu com erro ${response.statusCode}.');
     }
 
     try {
@@ -273,9 +373,45 @@ class ApiClient {
     throw ApiException('O servidor respondeu algo que o app não entendeu.');
   }
 
-  Future<http.Response> _send(Uri uri) async {
+  Future<List<dynamic>> _getList(String path) async {
+    final uri = Uri.tryParse('$baseUrl$path');
+    if (uri == null) throw ApiException('O endereço "$baseUrl" não é válido.');
+    final response = await _send(uri);
+    if (response.statusCode != 200) {
+      throw ApiException('O servidor respondeu com erro ${response.statusCode}.');
+    }
     try {
-      return await http.get(uri).timeout(_timeout);
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decoded is List<dynamic>) return decoded;
+    } on FormatException {
+      // cai no erro abaixo
+    }
+    throw ApiException('O servidor respondeu algo que o app não entendeu.');
+  }
+
+  Map<String, dynamic> _decodeMap(http.Response response) {
+    try {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decoded is Map<String, dynamic>) return decoded;
+    } on FormatException {
+      // cai no erro abaixo
+    }
+    throw ApiException('O servidor respondeu algo que o app não entendeu.');
+  }
+
+  Future<http.Response> _request(
+      String method, Uri uri, Map<String, dynamic>? body) async {
+    try {
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      final token = authToken;
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+      final encoded = body == null ? null : jsonEncode(body);
+      return await (method == 'GET'
+              ? http.get(uri, headers: headers)
+              : http.post(uri, headers: headers, body: encoded))
+          .timeout(_timeout);
     } on TimeoutException {
       throw ApiException(
         'O servidor em $baseUrl não respondeu a tempo. '
@@ -287,5 +423,9 @@ class ApiClient {
         'Confira o endereço e se o celular está no mesmo Wi-Fi do computador.',
       );
     }
+  }
+
+  Future<http.Response> _send(Uri uri) async {
+    return _request('GET', uri, null);
   }
 }
