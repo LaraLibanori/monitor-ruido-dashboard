@@ -1,4 +1,5 @@
 import main
+from datetime import datetime, timedelta, timezone
 from conftest import post_reading
 
 
@@ -68,7 +69,9 @@ def test_novo_alerta_depois_do_intervalo(client, make_resident, always_silence):
     make_resident()
     post_reading(client, sequence=1)
     with main.db.transaction() as cur:
-        cur.execute("UPDATE alert_events SET created_at = created_at - INTERVAL '16 minutes'")
+        cur.execute(
+            "UPDATE noise_incidents SET last_high_at = last_high_at - INTERVAL '16 minutes'"
+        )
     post_reading(client, sequence=2)
     assert len(_events()) == 2
 
@@ -149,3 +152,53 @@ def test_notificacao_de_teste_e_historico(client, admin, make_resident, always_s
     mine = client.get("/api/me/alerts", headers=ana["headers"]).json()
     assert len(mine) == 1
     assert all(d["user_id"] == ana["user"]["id"] for d in mine[0]["deliveries"])
+
+
+def test_ocorrencia_escalona_em_dois_e_cinco_minutos(client, make_resident, always_silence):
+    ana = make_resident(notifications={"email": True, "push": False})
+    main.alert_service.warning_seconds = 120
+    main.alert_service.fine_seconds = 300
+    post_reading(client, sequence=1)
+    with main.db.transaction() as cur:
+        cur.execute(
+            "UPDATE noise_incidents SET started_at = NOW() - INTERVAL '121 seconds'"
+        )
+    post_reading(client, sequence=2)
+    with main.db.transaction() as cur:
+        cur.execute(
+            "UPDATE noise_incidents SET started_at = NOW() - INTERVAL '301 seconds'"
+        )
+    post_reading(client, sequence=3)
+    with main.db.transaction() as cur:
+        cur.execute("SELECT stage FROM alert_events ORDER BY id")
+        assert [row["stage"] for row in cur.fetchall()] == ["warning", "fine_candidate"]
+        cur.execute("SELECT status FROM fines WHERE user_id = %s", (ana["user"]["id"],))
+        assert cur.fetchone()["status"] == "proposed"
+
+
+def test_reforma_aprovada_nao_escalona_para_multa(client, admin, make_resident, always_silence):
+    ana = make_resident(notifications={"email": True, "push": False})
+    now = datetime.now(timezone.utc)
+    request = client.post(
+        "/api/me/renovations",
+        headers=ana["headers"],
+        json={
+            "sensor_id": "sensor_ap1",
+            "starts_at": (now - timedelta(minutes=1)).isoformat(),
+            "ends_at": (now + timedelta(minutes=10)).isoformat(),
+            "description": "Troca de revestimento",
+        },
+    )
+    assert request.status_code == 201
+    request_id = request.json()["id"]
+    reviewed = client.patch(
+        f"/api/admin/renovations/{request_id}",
+        headers=admin["headers"],
+        json={"status": "approved"},
+    )
+    assert reviewed.status_code == 200
+    main.alert_service.warning_seconds = 0
+    post_reading(client)
+    with main.db.transaction() as cur:
+        cur.execute("SELECT COUNT(*) AS n FROM alert_events")
+        assert cur.fetchone()["n"] == 0

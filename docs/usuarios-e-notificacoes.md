@@ -8,10 +8,12 @@ Guia de uso e referência da API de administração do Monitor de Ruído.
 Sensor ESP32
   -> POST /api/noise
   -> leitura salva (horário de silêncio? nível alto/muito alto?)
-  -> evento de alerta (no máximo um por sensor a cada ALERT_COOLDOWN_MINUTES)
+  -> ocorrência contínua (leituras altas com intervalo máximo de 15 s)
+  -> advertência após 2 min -> candidata a multa após 5 min
   -> moradores ativos vinculados àquela casa
   -> push (FCM) e/ou e-mail (SMTP), conforme a preferência de cada um
   -> resultado de cada envio registrado (enviado, simulado, falhou, não enviado)
+  -> histórico de notificações disponível no app
 ```
 
 Papéis:
@@ -82,6 +84,29 @@ O alerta só é criado se o momento estiver dentro do horário de silêncio
 
 ## Configurar e-mail e push
 
+## Fluxo operacional completo
+
+1. O sensor envia uma leitura a cada aproximadamente 5 segundos.
+2. Leituras `alto` ou `muito_alto` durante o silêncio iniciam ou continuam uma
+   ocorrência. Se não houver leitura alta por 15 segundos, a ocorrência é
+   encerrada e uma nova sequência começa separadamente.
+3. Após 2 minutos contínuos, o sistema registra uma advertência e envia pelos
+   canais ativados do morador.
+4. Após 5 minutos contínuos, registra uma ocorrência candidata a multa e envia
+   nova notificação. A multa não é aplicada automaticamente: o administrador
+   precisa revisar a ocorrência e definir valor, vencimento e aprovação conforme
+   o regulamento do condomínio.
+5. O morador vê as notificações no ícone de sino do app, com canal, status e
+   ocorrência relacionada.
+6. Para uma reforma, o morador solicita sensor, período e descrição. O
+   administrador aprova ou rejeita em `/api/admin/renovations`. Durante uma
+   autorização aprovada, o ruído é registrado, mas não gera escalonamento para
+   multa.
+
+As durações são configuráveis por `NOISE_WARNING_SECONDS`,
+`NOISE_FINE_SECONDS` e `NOISE_CONTINUITY_GAP_SECONDS`. O padrão é 120, 300 e
+15 segundos.
+
 ### Sem credenciais (modo simulado)
 
 É o padrão. Tudo funciona, mas nenhum e-mail ou push sai de verdade: cada
@@ -132,7 +157,9 @@ Porta 587 usa STARTTLS; porta 465 usa SSL. No Gmail é preciso uma
 | `INVITE_TTL_HOURS` | Não | 72 | Validade do convite |
 | `APP_REQUIRE_AUTH` | Não | false | `true` = app só mostra casas após login |
 | `PUBLIC_BASE_URL` | Não | endereço do painel | Endereço usado nos links de convite |
-| `ALERT_COOLDOWN_MINUTES` | Não | 15 | Intervalo mínimo entre alertas do mesmo sensor |
+| `NOISE_CONTINUITY_GAP_SECONDS` | Não | 15 | Intervalo máximo entre leituras para manter a mesma ocorrência |
+| `NOISE_WARNING_SECONDS` | Não | 120 | Tempo contínuo até a advertência |
+| `NOISE_FINE_SECONDS` | Não | 300 | Tempo contínuo até a candidata a multa |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Só para e-mail real | — | Provedor de e-mail |
 | `FCM_CREDENTIALS_PATH` | Só para push real | — | Conta de serviço do Firebase |
 
@@ -162,6 +189,8 @@ Documentação interativa: `http://SEU-IP:5000/docs`.
 | POST | `/api/me/devices/remove` | Remove o token (logout) |
 | GET | `/api/me/alerts` | Alertas das casas autorizadas |
 | POST | `/api/me/notifications/test` | Envia um teste para si |
+| GET | `/api/me/notifications` | Histórico de notificações recebidas |
+| GET / POST | `/api/me/renovations` | Lista / solicita autorização de reforma |
 
 ### Administrador
 
@@ -179,6 +208,8 @@ Documentação interativa: `http://SEU-IP:5000/docs`.
 | GET | `/api/admin/deliveries` | Últimos envios (alertas, convites, testes) |
 | GET | `/api/admin/notifications/status` | Provedores em uso |
 | GET | `/api/admin/audit` | Auditoria |
+| GET / PATCH | `/api/admin/renovations` | Lista / aprova ou rejeita reformas |
+| GET / PATCH | `/api/admin/fines` | Lista / aprova, cancela ou marca multas como pagas |
 
 ### Aplicativo
 
@@ -198,6 +229,8 @@ local, a não ser que `APP_REQUIRE_AUTH=true`.
   (proxy reverso com certificado) antes de expor o sistema.
 - `POST /api/noise`, `/api/readings`, `/api/sensors` e o painel de leituras
   `/` continuam sem login, como antes, para os ESP32 e a rede local.
+- A candidata a multa é apenas um registro para decisão administrativa; não há
+  cobrança, boleto ou integração financeira automática.
 
 ## Testes
 

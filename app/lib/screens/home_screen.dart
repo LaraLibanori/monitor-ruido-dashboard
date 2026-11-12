@@ -14,6 +14,7 @@ import 'house_screen.dart';
 import '../push_registration.dart';
 import '../settings.dart';
 import 'login_screen.dart';
+import 'notification_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.api});
@@ -94,6 +95,16 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(widget.api.authToken == null ? Icons.login : Icons.logout),
             onPressed: widget.api.authToken == null ? _openLogin : _logout,
           ),
+          if (widget.api.authToken != null)
+            IconButton(
+              tooltip: 'Notificações',
+              icon: const Icon(Icons.notifications_none),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => NotificationHistoryScreen(api: widget.api),
+                ),
+              ),
+            ),
           IconButton(
             tooltip: 'Entenda as cores',
             icon: const Icon(Icons.help_outline),

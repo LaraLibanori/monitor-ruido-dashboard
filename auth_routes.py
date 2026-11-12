@@ -5,11 +5,13 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Request, Response
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 from alert_service import AlertService
 from auth_deps import AuthDeps
-from auth_service import AuthService, public_user
+from auth_service import AuthService, ServiceError, public_user
 
 
 class LoginIn(BaseModel):
@@ -44,6 +46,13 @@ class DeviceIn(BaseModel):
 
 class DeviceDeleteIn(BaseModel):
     token: str = Field(..., max_length=4096)
+
+
+class RenovationRequestIn(BaseModel):
+    sensor_id: str = Field(..., max_length=100)
+    starts_at: datetime
+    ends_at: datetime
+    description: str = Field(..., min_length=3, max_length=1000)
 
 
 def _client_ip(request: Request) -> str:
@@ -117,5 +126,25 @@ def build_auth_router(auth: AuthService, alerts: AlertService, deps: AuthDeps) -
     @router.post("/api/me/notifications/test", summary="Enviar notificação de teste para mim")
     def test_me(user: dict = Depends(deps.current_user)):
         return {"providers": alerts.providers(), "results": alerts.send_test(user)}
+
+    @router.get("/api/me/notifications", summary="Histórico de notificações do morador")
+    def my_notifications(limit: int = 100, user: dict = Depends(deps.current_user)):
+        return alerts.list_user_deliveries(user["id"], limit)
+
+    @router.get("/api/me/renovations", summary="Minhas autorizações de reforma")
+    def my_renovations(user: dict = Depends(deps.current_user)):
+        return alerts.list_renovation_requests(user["id"])
+
+    @router.post("/api/me/renovations", status_code=201,
+                 summary="Solicitar autorização de reforma")
+    def request_renovation(body: RenovationRequestIn, user: dict = Depends(deps.current_user)):
+        allowed = auth.allowed_sensor_ids(user)
+        if allowed is not None and body.sensor_id not in allowed:
+            raise ServiceError(403, "Você não pode solicitar reforma para esta casa.")
+        if body.ends_at <= body.starts_at:
+            raise ServiceError(422, "O fim da reforma deve ser posterior ao início.")
+        return alerts.create_renovation_request(
+            user["id"], body.sensor_id, body.starts_at, body.ends_at, body.description
+        )
 
     return router

@@ -27,6 +27,8 @@ os.environ["EMAIL_PROVIDER"] = "console"
 os.environ["PUSH_PROVIDER"] = "console"
 os.environ["APP_REQUIRE_AUTH"] = "false"
 os.environ.setdefault("LOGIN_MAX_FAILURES", "5")
+os.environ.setdefault("NOISE_WARNING_SECONDS", "0")
+os.environ.setdefault("NOISE_FINE_SECONDS", "300")
 
 
 def _recreate_database():
@@ -67,6 +69,7 @@ def clean_state(client):
             """
             TRUNCATE users, user_sessions, user_invites, user_sensors,
                      notification_preferences, device_tokens, alert_events,
+                     noise_incidents, renovation_requests, fines,
                      notification_deliveries, audit_log, app_settings,
                      noise_readings RESTART IDENTITY CASCADE
             """
@@ -76,6 +79,8 @@ def clean_state(client):
     email, push = ConsoleEmailProvider(), ConsolePushProvider()
     main.alert_service.email = email
     main.alert_service.push = push
+    main.alert_service.warning_seconds = int(os.getenv("NOISE_WARNING_SECONDS", "120"))
+    main.alert_service.fine_seconds = int(os.getenv("NOISE_FINE_SECONDS", "300"))
     main.auth_service.email = email
     main.auth_service._throttle._failures.clear()
     main.auth_service._throttle._ip_failures.clear()

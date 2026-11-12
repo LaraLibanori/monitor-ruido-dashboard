@@ -196,6 +196,43 @@ class History {
   }
 }
 
+class NotificationRecord {
+  NotificationRecord({
+    required this.kind,
+    required this.channel,
+    required this.status,
+    required this.detail,
+    required this.createdAt,
+    required this.sensorId,
+    required this.stage,
+    required this.noiseLevel,
+    required this.rms,
+  });
+
+  final String kind;
+  final String channel;
+  final String status;
+  final String? detail;
+  final String createdAt;
+  final String? sensorId;
+  final String? stage;
+  final String? noiseLevel;
+  final double? rms;
+
+  factory NotificationRecord.fromJson(Map<String, dynamic> json) =>
+      NotificationRecord(
+        kind: (json['kind'] as String?) ?? '',
+        channel: (json['channel'] as String?) ?? '',
+        status: (json['status'] as String?) ?? '',
+        detail: json['detail'] as String?,
+        createdAt: (json['created_at'] as String?) ?? '',
+        sensorId: json['sensor_id'] as String?,
+        stage: json['stage'] as String?,
+        noiseLevel: json['noise_level'] as String?,
+        rms: _toDouble(json['rms']),
+      );
+}
+
 // ---------------------------------------------
 // Cliente HTTP
 // ---------------------------------------------
@@ -249,6 +286,14 @@ class ApiClient {
     final json =
         await _get('/api/app/houses/${Uri.encodeComponent(sensorId)}/history');
     return History.fromJson(json);
+  }
+
+  Future<List<NotificationRecord>> notifications() async {
+    final values = await _getList('/api/me/notifications');
+    return values
+        .whereType<Map<String, dynamic>>()
+        .map(NotificationRecord.fromJson)
+        .toList();
   }
 
   Future<String> login(String email, String password) async {
@@ -322,6 +367,22 @@ class ApiClient {
       // bodyBytes + utf8 garante que acentos ("Área", "Sueli") cheguem certos
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       if (decoded is Map<String, dynamic>) return decoded;
+    } on FormatException {
+      // cai no erro abaixo
+    }
+    throw ApiException('O servidor respondeu algo que o app não entendeu.');
+  }
+
+  Future<List<dynamic>> _getList(String path) async {
+    final uri = Uri.tryParse('$baseUrl$path');
+    if (uri == null) throw ApiException('O endereço "$baseUrl" não é válido.');
+    final response = await _send(uri);
+    if (response.statusCode != 200) {
+      throw ApiException('O servidor respondeu com erro ${response.statusCode}.');
+    }
+    try {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decoded is List<dynamic>) return decoded;
     } on FormatException {
       // cai no erro abaixo
     }

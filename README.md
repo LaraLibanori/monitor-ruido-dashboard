@@ -104,6 +104,8 @@ Cada ESP32:
   silêncio, alertas e auditoria.
 - Alertas de barulho no horário de silêncio por push (FCM) e e-mail (SMTP),
   sem duplicar, respeitando casa, preferências e usuários inativos.
+- Ocorrências contínuas: advertência após 2 minutos, candidata a multa após
+  5 minutos, autorizações de reforma e histórico de notificações no app.
 - Modo simulado para e-mail e push quando não há credenciais.
 - Testes automatizados (API + PostgreSQL) e smoke test do Docker no CI.
 

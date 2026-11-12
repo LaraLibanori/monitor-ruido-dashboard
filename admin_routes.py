@@ -4,6 +4,7 @@
 # Todas as rotas exigem usuário com papel "admin".
 # =============================================
 
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Request
@@ -62,6 +63,17 @@ class SilenceIn(BaseModel):
     weekday_start: str = Field(..., max_length=5, examples=["22:00"])
     weekend_start: str = Field(..., max_length=5, examples=["15:00"])
     end: str = Field(..., max_length=5, examples=["09:00"])
+
+
+class RenovationReviewIn(BaseModel):
+    status: Literal["approved", "rejected", "cancelled"]
+
+
+class FineReviewIn(BaseModel):
+    status: Literal["approved", "cancelled", "paid"]
+    amount: float | None = Field(None, ge=0)
+    due_date: date | None = None
+    notes: str | None = Field(None, max_length=1000)
 
 
 def build_admin_router(auth: AuthService, alerts: AlertService, deps: AuthDeps) -> APIRouter:
@@ -159,11 +171,41 @@ def build_admin_router(auth: AuthService, alerts: AlertService, deps: AuthDeps) 
             "push": providers["push"],
             "email_real": providers["email"] == "smtp",
             "push_real": providers["push"] == "fcm",
-            "cooldown_minutes": alerts.cooldown_minutes,
+            "warning_seconds": alerts.warning_seconds,
+            "fine_seconds": alerts.fine_seconds,
+            "continuity_gap_seconds": alerts.continuity_gap_seconds,
         }
 
     @router.get("/audit", summary="Auditoria de ações")
     def audit(limit: int = 100, _=admin):
         return auth.audit(limit)
+
+    @router.get("/renovations", summary="Solicitações de reforma")
+    def list_renovations(_=admin):
+        return alerts.list_renovation_requests()
+
+    @router.patch("/renovations/{request_id}", summary="Aprovar ou rejeitar reforma")
+    def review_renovation(request_id: int, body: RenovationReviewIn, actor: dict = admin):
+        result = alerts.review_renovation_request(request_id, actor["id"], body.status)
+        if result is None:
+            raise ServiceError(404, "Solicitação de reforma não encontrada.")
+        auth.users.add_audit(actor["id"], "reforma_revisada", str(request_id),
+                             {"status": body.status})
+        return result
+
+    @router.get("/fines", summary="Candidatas e registros de multa")
+    def list_fines(_=admin):
+        return alerts.list_fines()
+
+    @router.patch("/fines/{fine_id}", summary="Aprovar, cancelar ou registrar multa paga")
+    def review_fine(fine_id: int, body: FineReviewIn, actor: dict = admin):
+        result = alerts.review_fine(
+            fine_id, actor["id"], body.status, body.amount, body.due_date, body.notes
+        )
+        if result is None:
+            raise ServiceError(404, "Registro de multa não encontrado.")
+        auth.users.add_audit(actor["id"], "multa_revisada", str(fine_id),
+                             {"status": body.status, "amount": body.amount})
+        return result
 
     return router
