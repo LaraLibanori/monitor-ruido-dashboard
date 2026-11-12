@@ -5,6 +5,37 @@ entregas do sistema. Os números abaixo descrevem os marcos efetivamente
 implementados no histórico do repositório; commits de checkpoint do Copilot
 não são considerados versões.
 
+## [0.6.0] - 2026-11-12
+
+### Ocorrências e notificações
+
+- Adicionadas ocorrências contínuas por sensor, com encerramento após o
+  intervalo configurado sem leituras altas.
+- Adicionada transição de advertência e candidata a multa por duração
+  contínua do ruído.
+- Adicionado histórico de notificações no aplicativo Flutter.
+- Adicionados parâmetros `NOISE_CONTINUITY_GAP_SECONDS`,
+  `NOISE_WARNING_SECONDS` e `NOISE_FINE_SECONDS`.
+
+### Reformas e multas
+
+- Moradores podem solicitar autorização de reforma para uma casa vinculada.
+- Administradores podem aprovar, rejeitar ou cancelar solicitações.
+- Ruído durante reforma aprovada fica registrado, sem escalonamento para
+  advertência ou multa.
+- Adicionado registro administrativo de multa com aprovação, cancelamento,
+  valor, vencimento, observações e marcação como paga.
+- Adicionadas abas de reformas e multas ao painel administrativo.
+- A multa continua sendo apenas um registro: não há boleto ou cobrança
+  financeira automática.
+
+### Operação e apresentação
+
+- Adicionadas as migrations `007_noise_incidents_renovations.sql` e rollback.
+- Atualizado o smoke test para validar o fluxo de ocorrências contínuas.
+- Adicionada apresentação visual, diagrama de arquitetura e fluxo operacional.
+- Regenerados os arquivos Android necessários para o build do aplicativo.
+
 ## [0.5.2] - 2026-11-11
 
 ### Segurança e estabilidade

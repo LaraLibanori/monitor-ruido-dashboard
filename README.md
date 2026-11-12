@@ -29,7 +29,7 @@ Ele **não grava, transmite ou armazena áudio**.
 
 ## Versão e histórico
 
-**Versão atual do projeto: `0.5.2`.**
+**Versão atual do projeto: `0.6.0`.**
 
 O histórico detalhado de cada versão está em
 [`CHANGELOG.md`](CHANGELOG.md). A versão da API exibida no OpenAPI é um

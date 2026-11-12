@@ -8,6 +8,10 @@ on:
     paths:
       - "app/**"
       - ".github/workflows/build-apk.yml"
+  pull_request:
+    paths:
+      - "app/**"
+      - ".github/workflows/build-apk.yml"
   workflow_dispatch:
 
 jobs:
