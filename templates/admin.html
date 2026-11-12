@@ -99,6 +99,8 @@
       <button class="tab" role="tab" data-tab="sensors" aria-selected="false">Casas e sensores</button>
       <button class="tab" role="tab" data-tab="silence" aria-selected="false">Horário de silêncio</button>
       <button class="tab" role="tab" data-tab="alerts" aria-selected="false">Alertas</button>
+      <button class="tab" role="tab" data-tab="renovations" aria-selected="false">Reformas</button>
+      <button class="tab" role="tab" data-tab="fines" aria-selected="false">Multas</button>
       <button class="tab" role="tab" data-tab="audit" aria-selected="false">Auditoria</button>
     </nav>
 
@@ -157,6 +159,32 @@
       <div class="table-wrap"><table>
         <thead><tr><th>Quando</th><th>Casa</th><th>Nível</th><th>Envios</th></tr></thead>
         <tbody id="alerts-body"></tbody>
+      </table></div>
+    </section>
+
+    <!-- Reformas -->
+    <section id="tab-renovations" class="card hidden">
+      <div class="row" style="margin-bottom:10px">
+        <h2 class="grow" style="margin:0">Autorizações de reforma</h2>
+        <button id="reload-renovations">Atualizar</button>
+      </div>
+      <p class="muted small">Aprovar uma reforma impede que o ruído autorizado seja escalado para advertência ou multa durante o período informado.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Solicitante</th><th>Casa</th><th>Período</th><th>Descrição</th><th>Status</th><th></th></tr></thead>
+        <tbody id="renovations-body"></tbody>
+      </table></div>
+    </section>
+
+    <!-- Multas -->
+    <section id="tab-fines" class="card hidden">
+      <div class="row" style="margin-bottom:10px">
+        <h2 class="grow" style="margin:0">Multas para análise</h2>
+        <button id="reload-fines">Atualizar</button>
+      </div>
+      <p class="muted small">A multa é um registro administrativo. Este sistema ainda não gera boleto nem faz cobrança financeira automática.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Morador</th><th>Sensor</th><th>Ocorrência</th><th>Valor</th><th>Vencimento</th><th>Status</th><th></th></tr></thead>
+        <tbody id="fines-body"></tbody>
       </table></div>
     </section>
 
@@ -274,8 +302,10 @@
   // ---------- abas ----------
   document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
-    ["users", "sensors", "silence", "alerts", "audit"].forEach((name) => show($("tab-" + name), name === tab.dataset.tab));
+    ["users", "sensors", "silence", "alerts", "renovations", "fines", "audit"].forEach((name) => show($("tab-" + name), name === tab.dataset.tab));
     if (tab.dataset.tab === "alerts") loadAlerts();
+    if (tab.dataset.tab === "renovations") loadRenovations();
+    if (tab.dataset.tab === "fines") loadFines();
     if (tab.dataset.tab === "audit") loadAudit();
   }));
 
@@ -479,6 +509,86 @@
       </tr>`).join("") || '<tr><td colspan="4" class="muted">Nenhum alerta ainda.</td></tr>';
   }
   $("reload-alerts").addEventListener("click", () => loadAlerts().catch((e) => alert(e.message)));
+
+  // ---------- reformas e multas ----------
+  const renovationStatus = {
+    pending: ["Pendente", "warn"], approved: ["Aprovada", "ok"],
+    rejected: ["Rejeitada", "bad"], cancelled: ["Cancelada", ""],
+  };
+  const fineStatus = {
+    proposed: ["Proposta", "warn"], approved: ["Aprovada", "ok"],
+    cancelled: ["Cancelada", "bad"], paid: ["Paga", "ok"],
+  };
+  const statusPillFrom = (value, labels) => {
+    const [label, css] = labels[value] || [value, ""];
+    return `<span class="pill ${css}">${esc(label)}</span>`;
+  };
+
+  async function loadRenovations() {
+    const rows = await api("/api/admin/renovations");
+    $("renovations-body").innerHTML = rows.map((r) => `
+      <tr>
+        <td>${esc(r.user_name || "—")}</td>
+        <td><code>${esc(r.sensor_id)}</code></td>
+        <td class="small">${esc(fmt(r.starts_at))}<br>até ${esc(fmt(r.ends_at))}</td>
+        <td>${esc(r.description)}</td>
+        <td>${statusPillFrom(r.status, renovationStatus)}</td>
+        <td>${r.status === "pending" ? `<div class="row" style="gap:6px">
+          <button data-renovation-action="approved" data-id="${r.id}" class="primary">Aprovar</button>
+          <button data-renovation-action="rejected" data-id="${r.id}" class="danger">Rejeitar</button>
+        </div>` : ""}</td>
+      </tr>`).join("") || '<tr><td colspan="6" class="muted">Nenhuma solicitação de reforma.</td></tr>';
+  }
+  $("reload-renovations").addEventListener("click", () => loadRenovations().catch((e) => alert(e.message)));
+  $("renovations-body").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button[data-renovation-action]");
+    if (!btn) return;
+    btn.disabled = true;
+    try {
+      await api(`/api/admin/renovations/${btn.dataset.id}`, {
+        method: "PATCH", body: {status: btn.dataset.renovationAction},
+      });
+      await loadRenovations();
+    } catch (e) { alert(e.message); } finally { btn.disabled = false; }
+  });
+
+  async function loadFines() {
+    const rows = await api("/api/admin/fines");
+    $("fines-body").innerHTML = rows.map((f) => `
+      <tr>
+        <td>${esc(f.user_name || "—")}</td>
+        <td><code>${esc(f.sensor_id || "—")}</code></td>
+        <td class="small">${esc(fmt(f.started_at))}<br>último nível alto: ${esc(fmt(f.last_high_at))}</td>
+        <td>${f.amount == null ? "—" : esc(Number(f.amount).toFixed(2))}</td>
+        <td>${esc(f.due_date || "—")}</td>
+        <td>${statusPillFrom(f.status, fineStatus)}</td>
+        <td>${f.status === "proposed" ? `<div class="row" style="gap:6px">
+          <button data-fine-action="approved" data-id="${f.id}" class="primary">Aprovar</button>
+          <button data-fine-action="cancelled" data-id="${f.id}" class="danger">Cancelar</button>
+        </div>` : f.status === "approved" ? `<button data-fine-action="paid" data-id="${f.id}">Marcar paga</button>` : ""}</td>
+      </tr>`).join("") || '<tr><td colspan="7" class="muted">Nenhuma multa registrada.</td></tr>';
+  }
+  $("reload-fines").addEventListener("click", () => loadFines().catch((e) => alert(e.message)));
+  $("fines-body").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button[data-fine-action]");
+    if (!btn) return;
+    const action = btn.dataset.fineAction;
+    let body = {status: action};
+    if (action === "approved") {
+      const amount = prompt("Valor da multa (ex.: 250.00):", "");
+      if (amount === null) return;
+      const dueDate = prompt("Vencimento (AAAA-MM-DD, opcional):", "");
+      if (dueDate === null) return;
+      const notes = prompt("Observação (opcional):", "") || null;
+      body = {status: action, amount: amount ? Number(amount) : null, due_date: dueDate || null, notes};
+    }
+    btn.disabled = true;
+    try {
+      await api(`/api/admin/fines/${btn.dataset.id}`, {method: "PATCH", body});
+      await loadFines();
+    } catch (e) { alert(e.message); } finally { btn.disabled = false; }
+  });
+
   async function loadAudit() {
     const rows = await api("/api/admin/audit?limit=100");
     $("audit-body").innerHTML = rows.map((a) => `
