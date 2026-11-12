@@ -669,6 +669,9 @@ Verifique o Serial Monitor e o endpoint `/api/app/overview`.
 | `docs/relatorio-final-preparacao-hardware.md` | Preparação para hardware e instalação |
 | `docs/roteiro-validacao-final.md` | Testes do servidor, sensores, Android e 24 horas |
 | `docs/usuarios-e-notificacoes.md` | Login, moradores, convites, alertas, e-mail/push e rotas |
+| `docs/apresentacao-projeto.md` | Apresentação resumida, arquitetura e demonstração |
+| `docs/arquitetura.svg` | Diagrama visual da arquitetura |
+| `docs/fluxo-operacional.svg` | Diagrama visual de advertência, multa e reforma |
 | `projeto-1-dashboard/README.md` | Escopo do Dashboard Web |
 | `projeto-2-android/README.md` | Escopo do aplicativo Android |
 

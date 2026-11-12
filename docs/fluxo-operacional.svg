@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700">
+  <rect width="1200" height="700" fill="#081018"/>
+  <text x="60" y="60" fill="#e2e8f0" font-family="Arial" font-size="32" font-weight="700">Fluxo de notificação e multa</text>
+  <g font-family="Arial" font-size="19" text-anchor="middle">
+    <rect x="70" y="120" width="220" height="82" rx="16" fill="#123b55" stroke="#60a5fa" stroke-width="3"/><text x="180" y="155" fill="#fff">Leitura do sensor</text><text x="180" y="184" fill="#b9d8f5">alto / muito alto</text>
+    <rect x="350" y="120" width="220" height="82" rx="16" fill="#174936" stroke="#00e5a0" stroke-width="3"/><text x="460" y="155" fill="#fff">Ocorrência contínua</text><text x="460" y="184" fill="#baf8df">gap máximo: 15 s</text>
+    <rect x="630" y="120" width="220" height="82" rx="16" fill="#453512" stroke="#fbbf24" stroke-width="3"/><text x="740" y="155" fill="#fff">2 minutos</text><text x="740" y="184" fill="#fbe7a4">advertência</text>
+    <rect x="910" y="120" width="220" height="82" rx="16" fill="#422124" stroke="#fb7185" stroke-width="3"/><text x="1020" y="155" fill="#fff">5 minutos</text><text x="1020" y="184" fill="#fecdd3">candidata a multa</text>
+    <rect x="350" y="390" width="220" height="82" rx="16" fill="#29213f" stroke="#c4b5fd" stroke-width="3"/><text x="460" y="425" fill="#fff">Reforma aprovada</text><text x="460" y="454" fill="#ddd6fe">não escala para multa</text>
+    <rect x="630" y="390" width="220" height="82" rx="16" fill="#29213f" stroke="#c4b5fd" stroke-width="3"/><text x="740" y="425" fill="#fff">Painel administrativo</text><text x="740" y="454" fill="#ddd6fe">revisa e define valor</text>
+    <rect x="910" y="390" width="220" height="82" rx="16" fill="#174936" stroke="#00e5a0" stroke-width="3"/><text x="1020" y="425" fill="#fff">Histórico no app</text><text x="1020" y="454" fill="#baf8df">canal e status</text>
+  </g>
+  <g stroke="#94a3b8" stroke-width="4" fill="none" marker-end="url(#arrow)">
+    <path d="M290 161H340"/><path d="M570 161H620"/><path d="M850 161H900"/>
+    <path d="M740 205V380"/><path d="M570 431H620"/><path d="M850 431H900"/>
+    <path d="M460 205V380"/>
+  </g>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#94a3b8"/></marker></defs>
+  <text x="600" y="610" fill="#8b98a9" font-family="Arial" font-size="18" text-anchor="middle">A multa não é cobrança automática: é uma decisão administrativa registrada</text>
+</svg>
+
