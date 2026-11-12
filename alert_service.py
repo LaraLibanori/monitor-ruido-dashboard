@@ -83,7 +83,7 @@ class AlertService:
             body = (f"Ruído {level} contínuo por {minutes} minutos às {local:%H:%M} "
                     f"({local:%d/%m}) em {reading['house_name']}. A multa depende de aprovação.")
         else:
-            title = f"Advertência de ruído — {reading['house_name']}"
+            title = f"Advertência de ruído no horário de silêncio — {reading['house_name']}"
             body = (f"Nível {level} contínuo por {minutes} minutos às {local:%H:%M} "
                     f"({local:%d/%m}) em {reading['house_name']}. Abra o app para acompanhar.")
         data = {"type": "noise_alert", "stage": stage,
