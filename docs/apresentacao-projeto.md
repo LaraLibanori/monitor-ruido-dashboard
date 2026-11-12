@@ -1,6 +1,11 @@
 # Monitor de Ruído — apresentação do projeto
 
-## 1. Objetivo
+> **Apresentação executiva ao vivo:** depois de iniciar o sistema, acesse
+> `http://localhost:5000/apresentacao`. Esta visão foi criada para
+> demonstrações, reuniões e apresentação do produto; o painel operacional
+> continua em `/` e a administração em `/admin`.
+
+1. Objetivo
 
 Monitorar a intensidade sonora de quatro áreas usando ESP32 e INMP441,
 registrar as leituras e avisar moradores e administradores quando houver

@@ -239,6 +239,14 @@ def dashboard(request: Request):
     )
 
 
+@app.get("/apresentacao", response_class=HTMLResponse, include_in_schema=False)
+def presentation_page(request: Request):
+    return templates.TemplateResponse(
+        "apresentacao.html", {"request": request},
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
 def admin_page(request: Request):
     return templates.TemplateResponse(

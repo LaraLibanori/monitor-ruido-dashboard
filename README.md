@@ -161,7 +161,9 @@ monitor-ruido-v5/
 ├── firmware/                      # Código dos ESP32 e manual
 ├── migrations/                    # Migrations PostgreSQL
 ├── templates/
-│   └── index.html                 # Dashboard Web
+│   ├── index.html                 # Dashboard Web operacional
+│   ├── apresentacao.html          # Dashboard executivo de apresentação
+│   └── admin.html                 # Painel administrativo
 ├── docs/                          # Arquitetura, validação e operação
 ├── main.py                        # Aplicação FastAPI
 ├── app_routes.py                  # Rotas específicas do app
@@ -471,6 +473,13 @@ Acesse:
 http://localhost:5000
 ```
 
+Para uma apresentação executiva do produto, com arquitetura, indicadores e
+estado dos sensores:
+
+```text
+http://localhost:5000/apresentacao
+```
+
 O dashboard apresenta:
 
 - última leitura recebida;
@@ -485,6 +494,10 @@ O dashboard apresenta:
 O dashboard não depende de Tailwind, Chart.js ou Google Fonts externos. O
 gráfico utiliza `canvas` nativo e o layout possui estilos locais de fallback,
 permitindo teste sem internet.
+
+A apresentação executiva é uma segunda visão, voltada para demonstrações,
+reuniões e documentação do produto. Ela consulta a mesma API e não substitui
+o painel operacional nem o painel administrativo.
 
 ## Aplicativo Android e Flutter Web
 

@@ -117,3 +117,6 @@ def test_paginas_html(client):
     invite_page = client.get("/convite?token=abc")
     assert invite_page.status_code == 200
     assert invite_page.headers["referrer-policy"] == "no-referrer"
+    presentation_page = client.get("/apresentacao")
+    assert presentation_page.status_code == 200
+    assert "Visão executiva" in presentation_page.text
