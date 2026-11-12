@@ -68,6 +68,7 @@ jobs:
     env:
       SECRET_KEY: chave-somente-para-o-ci
       SMOKE_ADMIN_PASSWORD: senha-somente-para-o-ci
+      NOISE_WARNING_SECONDS: 0
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -44,8 +44,10 @@ services:
       INVITE_TTL_HOURS: ${INVITE_TTL_HOURS:-72}
       APP_REQUIRE_AUTH: ${APP_REQUIRE_AUTH:-false}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
-      # Alertas: intervalo mínimo (min) entre dois alertas do mesmo sensor
-      ALERT_COOLDOWN_MINUTES: ${ALERT_COOLDOWN_MINUTES:-15}
+      # Ocorrências contínuas: gap, advertência e candidata a multa
+      NOISE_CONTINUITY_GAP_SECONDS: ${NOISE_CONTINUITY_GAP_SECONDS:-15}
+      NOISE_WARNING_SECONDS: ${NOISE_WARNING_SECONDS:-120}
+      NOISE_FINE_SECONDS: ${NOISE_FINE_SECONDS:-300}
       # E-mail (vazio = modo simulado, nada é enviado)
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
